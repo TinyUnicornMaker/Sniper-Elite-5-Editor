@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# PyInstaller
+*.spec.bak
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Backups created by the editor
+*.asrpatch.bak
+*.asr.bak
+
+# OS
+Thumbs.db
+desktop.ini
+
+# Logs / temp
+*.log
+/tmp/

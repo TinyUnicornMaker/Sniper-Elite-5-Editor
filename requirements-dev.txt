@@ -1,0 +1,2 @@
+# Development dependencies for building Windows binaries
+pyinstaller>=6.0
