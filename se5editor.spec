@@ -73,7 +73,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,          # GUI app — no console window
-    icon=os.path.join('assets', 'icons', 'se5editor.png'),
+    icon=os.path.join('assets', 'icons', 'se5editor.ico'),
 )
 
 coll = COLLECT(
