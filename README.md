@@ -71,7 +71,7 @@ This single file contains all weapon, scope, and attachment stats.
 | `gui/presets.py` | Preset definitions and application logic |
 | `assets/icons/` | Application icons (16–256px) |
 
-## Building a Windows Binary
+## Building a Binary (Windows and Linux)
 
 A PyInstaller spec file and GitHub Actions workflow are included for
 building standalone Windows and Linux binaries.
