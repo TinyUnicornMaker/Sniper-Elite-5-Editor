@@ -81,21 +81,21 @@ jobs:
       - name: Build with PyInstaller
         run: pyinstaller se5editor.spec --noconfirm
 
-      - name: Tar the build
+      - name: Zip the build
         run: |
           cd dist
-          tar czf SniperElite5Editor-${{ github.ref_name }}-linux.tar.gz SniperElite5Editor
+          zip -r SniperElite5Editor-${{ github.ref_name }}-linux.zip SniperElite5Editor
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: SniperElite5Editor-${{ github.ref_name }}-linux
-          path: dist/SniperElite5Editor-${{ github.ref_name }}-linux.tar.gz
+          path: dist/SniperElite5Editor-${{ github.ref_name }}-linux.zip
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/SniperElite5Editor-${{ github.ref_name }}-linux.tar.gz
+          files: dist/SniperElite5Editor-${{ github.ref_name }}-linux.zip
           draft: true
           generate_release_notes: true
