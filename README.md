@@ -74,7 +74,7 @@ This single file contains all weapon, scope, and attachment stats.
 ## Building a Windows Binary
 
 A PyInstaller spec file and GitHub Actions workflow are included for
-building a standalone Windows `.exe`.
+building standalone Windows and Linux binaries.
 
 ### Local build (Windows)
 
@@ -84,12 +84,36 @@ pip install -r requirements-dev.txt
 pyinstaller se5editor.spec
 ```
 
-The executable will be in `dist/SniperElite5Editor/`.
+The executable will be in `dist/SniperElite5Editor/SniperElite5Editor.exe`.
+
+### Local build (Linux)
+
+```bash
+# Install system dependencies for PySide6/Qt
+sudo apt-get install -y libgl1 libegl1 libxkbcommon0 libdbus-1-3 \
+  libfontconfig1 libxcb-cursor0 libxcb-xinerama0 libxcb-icccm4 \
+  libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+  libxcb-shape0 libxcb-sync1 libxcb-util1 libxcb-xfixes0 libxfixes3 \
+  libxrandr2 libxrender1 libasound2 libpulse0
+
+# Install Python dependencies
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+
+# Build
+pyinstaller se5editor.spec
+
+# Zip the output
+cd dist && zip -r SniperElite5Editor-linux.zip SniperElite5Editor
+```
+
+The executable will be in `dist/SniperElite5Editor/SniperElite5Editor`.
 
 ### GitHub Actions
 
 Push a tag (e.g. `v1.0.0`) to trigger the build workflow, which
-produces a downloadable Windows binary artifact.
+produces downloadable Windows (`.zip`) and Linux (`.zip`) binary
+artifacts and creates a GitHub Release.
 
 ## ASR File Format
 
