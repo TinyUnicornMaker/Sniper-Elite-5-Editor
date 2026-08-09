@@ -357,6 +357,50 @@ class AsrFile:
         self._zbb_extra_header: bytes = b""  # extra 16 bytes for ZBB
         self._load()
 
+    @staticmethod
+    def _format_error_message(path: str, magic: bytes, size: int) -> str:
+        """Build a user-friendly error when the file is not AsuraZlb/Zbb."""
+        import os
+
+        name = os.path.basename(path)
+        magic_display = magic.decode("latin-1", errors="replace")
+        lines = [
+            f"Unknown file format in:\n  {path}\n",
+            f"File size: {size:,} bytes",
+            f"Header bytes: {magic!r}  ({magic_display!r})",
+            f"Expected: {MAGIC_ZLB.decode()!r} or {MAGIC_ZBB.decode()!r}",
+            "",
+            "This usually means the wrong file was selected.",
+            "",
+            "Open this file (under the game install):",
+            "  Sniper Elite 5/misc/common.asr.asrpatch",
+            "",
+            "Do NOT open:",
+            "  • common.asr          (huge ~489 MB base file)",
+            "  • common.asr_en       (localization — magic 'Asura   ')",
+            "  • *.pc.sounds / *.ts  (audio/text containers)",
+            "  • any navmesh .asrpatch",
+        ]
+        lower = name.lower()
+        if lower.endswith(".asr_en") or magic[:5] == b"Asura" and magic[5:] == b"   ":
+            lines.append(
+                "\nYour file looks like a localization/asset container "
+                "(magic 'Asura' + spaces), not a weapon patch."
+            )
+        elif lower == "common.asr" or (
+            lower.endswith(".asr") and not lower.endswith(".asrpatch")
+        ):
+            lines.append(
+                "\nTip: use common.asr.asrpatch (the small patch in misc/), "
+                "not common.asr."
+            )
+        elif not lower.endswith(".asrpatch"):
+            lines.append(
+                "\nTip: the file name should be exactly common.asr.asrpatch "
+                "(about 5–10 MB, starts with AsuraZlb)."
+            )
+        return "\n".join(lines)
+
     def _load(self) -> None:
         """Load and decompress the ASR file."""
         with open(self.path, "rb") as f:
@@ -384,6 +428,8 @@ class AsrFile:
         elif raw[:8] == MAGIC_ZBB:
             # AsuraZbb format - block-based compression.
             # Header is 24 bytes: 8-byte magic + 16 bytes of metadata.
+            # Note: only the first zlib stream is expanded here; multi-block
+            # ZBB base files (e.g. common.asr) will load incompletely.
             self._format = "ZBB"
             self.header = raw[:8]
             self._zbb_extra_header = raw[8:24]
@@ -395,8 +441,7 @@ class AsrFile:
                 ) from e
         else:
             raise ValueError(
-                f"Unknown file format: {raw[:8]!r} "
-                f"(expected {MAGIC_ZLB!r} or {MAGIC_ZBB!r})"
+                self._format_error_message(self.path, raw[:8], len(raw))
             )
 
         self._scan_entities()

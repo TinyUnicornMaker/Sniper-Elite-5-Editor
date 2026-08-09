@@ -185,6 +185,31 @@ class MainWindow(QMainWindow):
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
 
+    @staticmethod
+    def _default_open_dir() -> str:
+        """Best-effort guess of SE5 misc/ for the file dialog start folder."""
+        candidates = [
+            # Linux Steam (Debian/Ubuntu packaging)
+            "~/.steam/debian-installation/steamapps/common/Sniper Elite 5/misc",
+            "~/.steam/steam/steamapps/common/Sniper Elite 5/misc",
+            "~/.local/share/Steam/steamapps/common/Sniper Elite 5/misc",
+            # Windows Steam defaults
+            r"C:\Program Files (x86)\Steam\steamapps\common\Sniper Elite 5\misc",
+            r"C:\Program Files\Steam\steamapps\common\Sniper Elite 5\misc",
+            # Windows env-based
+            os.path.expandvars(
+                r"%ProgramFiles(x86)%\Steam\steamapps\common\Sniper Elite 5\misc"
+            ),
+            os.path.expandvars(
+                r"%ProgramFiles%\Steam\steamapps\common\Sniper Elite 5\misc"
+            ),
+        ]
+        for c in candidates:
+            path = os.path.expanduser(c)
+            if path and os.path.isdir(path):
+                return path
+        return os.path.expanduser("~")
+
     def _open_file(self):
         # Show info popup explaining which files are needed (only once per session)
         if not self._info_shown:
@@ -198,27 +223,32 @@ class MainWindow(QMainWindow):
                 "magazines, barrels, and all gameplay stats.<br>"
                 "<i>This is the only file the editor supports.</i></li>"
                 "</ul>"
-                "<p><b>Location:</b></p>"
-                "<p><code>Sniper Elite 5/misc/common.asr.asrpatch</code></p>"
+                "<p><b>Location (inside the game install):</b></p>"
+                "<p><code>Sniper Elite 5\\misc\\common.asr.asrpatch</code></p>"
+                "<p>Typical Steam path on Windows:</p>"
+                "<p><code>C:\\Program Files (x86)\\Steam\\steamapps\\common\\"
+                "Sniper Elite 5\\misc\\common.asr.asrpatch</code></p>"
+                "<p>The correct file is usually <b>~5–10&nbsp;MB</b> and is "
+                "<b>not</b> the huge <code>common.asr</code> (~489&nbsp;MB).</p>"
                 "<p>The editor will automatically create a <b>.bak</b> backup "
                 "the first time you open a file, so you can always restore "
                 "the original.</p>"
-                "<p><b>Note:</b> Do not open <code>common.asr</code> (the large "
-                "489MB base file) — always use the <code>.asrpatch</code> file, "
-                "which contains the override values the game loads on top.</p>",
+                "<p><b>Do not open:</b> <code>common.asr</code>, "
+                "<code>common.asr_en</code>, or any <code>.pc.sounds</code> "
+                "file — those will show &quot;Unknown file format&quot; or "
+                "load incomplete data.</p>",
             )
 
-        # Default to the SE5 misc directory
-        default_dir = os.path.expanduser(
-            "~/.steam/debian-installation/steamapps/common/Sniper Elite 5/misc"
-        )
-        if not os.path.isdir(default_dir):
-            default_dir = os.path.expanduser("~")
+        default_dir = self._default_open_dir()
 
+        # Use wildcard filters so Windows native dialogs list the file correctly.
+        # (A bare "common.asr.asrpatch" pattern without * is unreliable on Win.)
         path, _ = QFileDialog.getOpenFileName(
             self, "Open common.asr.asrpatch",
             default_dir,
-            "ASR Patch Files (common.asr.asrpatch);;All Files (*)",
+            "ASR Patch (*.asrpatch);;"
+            "common.asr.asrpatch (common.asr.asrpatch);;"
+            "All Files (*)",
         )
         if not path:
             return
@@ -271,6 +301,33 @@ class MainWindow(QMainWindow):
             self.apply_all_btn.setEnabled(True)
             self._refresh_actions()
             self._update_window_title()
+
+            # Warn when the wrong container was opened even if magic matched.
+            base = os.path.basename(path).lower()
+            n_ent = len(new_asr.entities)
+            if base == "common.asr" or (
+                base.endswith(".asr")
+                and not base.endswith(".asrpatch")
+                and not base.endswith(".bak")
+            ):
+                QMessageBox.warning(
+                    self, "Wrong File?",
+                    f"Loaded <b>{os.path.basename(path)}</b> "
+                    f"({n_ent} entities found).<br><br>"
+                    "Weapon stats should be edited in "
+                    "<b>common.asr.asrpatch</b> (in the <code>misc</code> "
+                    "folder), not the large base <code>common.asr</code>. "
+                    "Base files may load incompletely and will not match "
+                    "what the game uses for overrides.",
+                )
+            elif n_ent == 0:
+                QMessageBox.warning(
+                    self, "No Weapon Data Found",
+                    f"Loaded <b>{os.path.basename(path)}</b> successfully, "
+                    f"but found <b>0</b> known weapon/attachment entities.<br><br>"
+                    "Make sure you opened:<br>"
+                    "<code>Sniper Elite 5/misc/common.asr.asrpatch</code>",
+                )
 
         except Exception as e:
             # Reset state so the UI doesn't show stale/partial data
