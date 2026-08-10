@@ -33,6 +33,9 @@ from typing import Dict, List, Optional, Tuple, Union
 
 MAGIC_ZLB = b"AsuraZlb"
 MAGIC_ZBB = b"AsuraZbb"
+# Uncompressed Asura archive (the *inner* payload of a ZLB file).
+# Some tools / installs leave common.asr.asrpatch in this form (~17 MB).
+MAGIC_RAW = b"Asura   "
 
 # ── Property type tags ────────────────────────────────────────────────────
 
@@ -359,7 +362,7 @@ class AsrFile:
 
     @staticmethod
     def _format_error_message(path: str, magic: bytes, size: int) -> str:
-        """Build a user-friendly error when the file is not AsuraZlb/Zbb."""
+        """Build a user-friendly error when the file is not a supported Asura container."""
         import os
 
         name = os.path.basename(path)
@@ -368,41 +371,43 @@ class AsrFile:
             f"Unknown file format in:\n  {path}\n",
             f"File size: {size:,} bytes",
             f"Header bytes: {magic!r}  ({magic_display!r})",
-            f"Expected: {MAGIC_ZLB.decode()!r} or {MAGIC_ZBB.decode()!r}",
-            "",
-            "This usually means the wrong file was selected.",
+            f"Expected: {MAGIC_ZLB.decode()!r}, {MAGIC_ZBB.decode()!r}, "
+            f"or uncompressed {MAGIC_RAW.decode()!r}",
             "",
             "Open this file (under the game install):",
             "  Sniper Elite 5/misc/common.asr.asrpatch",
             "",
             "Do NOT open:",
             "  • common.asr          (huge ~489 MB base file)",
-            "  • common.asr_en       (localization — magic 'Asura   ')",
+            "  • common.asr_en       (localization)",
             "  • *.pc.sounds / *.ts  (audio/text containers)",
             "  • any navmesh .asrpatch",
         ]
         lower = name.lower()
-        if lower.endswith(".asr_en") or magic[:5] == b"Asura" and magic[5:] == b"   ":
-            lines.append(
-                "\nYour file looks like a localization/asset container "
-                "(magic 'Asura' + spaces), not a weapon patch."
-            )
-        elif lower == "common.asr" or (
+        if lower == "common.asr" or (
             lower.endswith(".asr") and not lower.endswith(".asrpatch")
         ):
             lines.append(
-                "\nTip: use common.asr.asrpatch (the small patch in misc/), "
+                "\nTip: use common.asr.asrpatch (the patch in misc/), "
                 "not common.asr."
             )
         elif not lower.endswith(".asrpatch"):
             lines.append(
-                "\nTip: the file name should be exactly common.asr.asrpatch "
-                "(about 5–10 MB, starts with AsuraZlb)."
+                "\nTip: the file name should be exactly common.asr.asrpatch."
             )
         return "\n".join(lines)
 
     def _load(self) -> None:
-        """Load and decompress the ASR file."""
+        """Load and decompress the ASR file.
+
+        Supported outer containers:
+          - AsuraZlb — zlib-compressed (normal Steam common.asr.asrpatch)
+          - AsuraZbb — block-compressed base archives
+          - Asura\\x20\\x20\\x20 — uncompressed archive body (same bytes that
+            live *inside* a ZLB file). Some Windows installs / third-party
+            tools leave the patch in this form (~17 MB, magic 'Asura   ').
+            That is the real Windows "file looks correct but won't open" case.
+        """
         with open(self.path, "rb") as f:
             raw = f.read()
 
@@ -439,6 +444,28 @@ class AsrFile:
                 raise ValueError(
                     f"Failed to decompress ZBB body: {e}"
                 ) from e
+        elif raw[:8] == MAGIC_RAW:
+            # Uncompressed Asura archive — identical to the decompressed ZLB
+            # body. Accept it so Windows users whose patch was left
+            # decompressed can still edit weapon data (~17 MB).
+            #
+            # Reject huge Asura-space files (localization / sounds) early so
+            # we don't scan hundreds of MB looking for weapon entities.
+            # A normal decompressed common.asr.asrpatch is ~15–20 MB.
+            if len(raw) > 40 * 1024 * 1024:
+                raise ValueError(
+                    self._format_error_message(self.path, raw[:8], len(raw))
+                    + "\n\nThis uncompressed Asura file is too large to be "
+                    "common.asr.asrpatch (expected ~17 MB, got "
+                    f"{len(raw) / (1024 * 1024):.0f} MB). "
+                    "You may have selected a localization or audio file."
+                )
+            self._format = "RAW"
+            self.header = raw[:8]
+            self.flags = 0
+            self.comp_size = 0
+            self.uncomp_size = len(raw)
+            self.body = bytearray(raw)
         else:
             raise ValueError(
                 self._format_error_message(self.path, raw[:8], len(raw))
@@ -698,7 +725,9 @@ class AsrFile:
     def save(self, output_path: str) -> None:
         """Recompress and write the modified ASR file.
 
-        Preserves the original container format (AsuraZlb or AsuraZbb).
+        Preserves AsuraZbb when the source was ZBB. ZLB and RAW sources are
+        written as AsuraZlb (the format the game expects for
+        common.asr.asrpatch). RAW inputs are therefore "repaired" on save.
         Uses zlib with wbits=13 to match the engine's expectations.
         """
         co = zlib.compressobj(6, zlib.DEFLATED, 13)
@@ -717,13 +746,14 @@ class AsrFile:
             # Preserve AsuraZbb format: 8-byte magic + 16-byte metadata
             out.extend(MAGIC_ZBB)
             out.extend(self._zbb_extra_header)
+            out.extend(compressed)
         else:
-            # Default to AsuraZlb format
+            # ZLB and RAW → AsuraZlb (game-readable weapon patch format)
             out.extend(MAGIC_ZLB)
             out.extend(struct.pack("<I", self.flags))
             out.extend(struct.pack("<I", len(compressed)))
             out.extend(struct.pack("<I", len(self.body)))
-        out.extend(compressed)
+            out.extend(compressed)
 
         with open(output_path, "wb") as f:
             f.write(out)

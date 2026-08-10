@@ -117,11 +117,13 @@ artifacts and creates a GitHub Release.
 
 ## ASR File Format
 
-The game uses AsuraZlb containers:
+The game uses Asura containers. The editor accepts:
 
-- 8-byte magic (`AsuraZlb`)
-- 4-byte flags, 4-byte compressed size, 4-byte uncompressed size
-- zlib-compressed body (wbits=13)
+- **AsuraZlb** — normal compressed `common.asr.asrpatch` (~5–10 MB)
+- **AsuraZbb** — block-compressed base archives
+- **Raw `Asura   `** — uncompressed body (~17 MB). Some Windows installs
+  or third-party tools leave the patch in this form; the editor loads it
+  and re-saves as AsuraZlb so the game can use the changes.
 
 Properties are 12-byte tuples: `[type:4][value:4][hash:4]`
 

@@ -23,10 +23,22 @@ python3 se5editor.py
 
 ## ASR File Format
 
-The game uses AsuraZlb containers:
-- 8-byte magic (`AsuraZlb`)
-- 4-byte flags, 4-byte compressed size, 4-byte uncompressed size
-- zlib-compressed body (wbits=13)
+The game uses Asura containers. Supported outer formats:
+
+1. **AsuraZlb** (normal Steam `common.asr.asrpatch`, ~5–10 MB)
+   - 8-byte magic (`AsuraZlb`)
+   - 4-byte flags, 4-byte compressed size, 4-byte uncompressed size
+   - zlib-compressed body (wbits=13)
+
+2. **AsuraZbb** — block-compressed base archives (e.g. `common.asr`)
+
+3. **Raw `Asura   `** (uncompressed body, ~17 MB)
+   - Identical to the *decompressed* ZLB payload
+   - Seen on some Windows installs / after third-party tools
+   - This was the v1.0.0 "Unknown file format: b'Asura   '" Windows bug
+   - On save, rewritten as AsuraZlb so the game can load it
+
+The decompressed body itself starts with `Asura   PNFO...`.
 
 Properties are 12-byte tuples: `[type:4][value:4][hash:4]`
 - Type 0 = int32, Type 1 = float32, Type 4 = string

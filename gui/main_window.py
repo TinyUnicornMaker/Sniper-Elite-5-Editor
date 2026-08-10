@@ -228,8 +228,10 @@ class MainWindow(QMainWindow):
                 "<p>Typical Steam path on Windows:</p>"
                 "<p><code>C:\\Program Files (x86)\\Steam\\steamapps\\common\\"
                 "Sniper Elite 5\\misc\\common.asr.asrpatch</code></p>"
-                "<p>The correct file is usually <b>~5–10&nbsp;MB</b> and is "
-                "<b>not</b> the huge <code>common.asr</code> (~489&nbsp;MB).</p>"
+                "<p>The correct file is usually <b>~5–10&nbsp;MB</b> "
+                "(compressed) or about <b>~17&nbsp;MB</b> if another tool "
+                "left it decompressed. It is <b>not</b> the huge "
+                "<code>common.asr</code> (~489&nbsp;MB).</p>"
                 "<p>The editor will automatically create a <b>.bak</b> backup "
                 "the first time you open a file, so you can always restore "
                 "the original.</p>"
@@ -320,13 +322,30 @@ class MainWindow(QMainWindow):
                     "Base files may load incompletely and will not match "
                     "what the game uses for overrides.",
                 )
+            elif getattr(new_asr, "_format", "") == "RAW" and n_ent > 0:
+                # Uncompressed body (magic 'Asura   ') — common on Windows
+                # when a tool left the patch decompressed. Save will wrap
+                # it back into AsuraZlb so the game can load it.
+                QMessageBox.information(
+                    self, "Uncompressed Patch Loaded",
+                    f"Loaded <b>{os.path.basename(path)}</b> "
+                    f"({n_ent} entities).<br><br>"
+                    "This file is the <b>uncompressed</b> Asura archive "
+                    "(header <code>Asura&nbsp;&nbsp;&nbsp;</code>) rather than "
+                    "the usual compressed <code>AsuraZlb</code> form.<br><br>"
+                    "Editing works normally. When you <b>Save</b>, the editor "
+                    "will write a proper <code>AsuraZlb</code> patch so the "
+                    "game can load your changes.",
+                )
             elif n_ent == 0:
                 QMessageBox.warning(
                     self, "No Weapon Data Found",
                     f"Loaded <b>{os.path.basename(path)}</b> successfully, "
                     f"but found <b>0</b> known weapon/attachment entities.<br><br>"
                     "Make sure you opened:<br>"
-                    "<code>Sniper Elite 5/misc/common.asr.asrpatch</code>",
+                    "<code>Sniper Elite 5/misc/common.asr.asrpatch</code><br><br>"
+                    "Navmesh and localization <code>.asrpatch</code> files "
+                    "are not supported.",
                 )
 
         except Exception as e:
