@@ -112,6 +112,15 @@ The editor recognizes these weapon/attachment types (defined in `asr.py`):
 - **Scopes** (SCOPE_ENTITIES): 14 scopes
 - **Attachments**: Barrels (49), Magazines (40), Suppressors (6), Ironsights (32), Chokes (11), Stocks & Grips (27)
 
+## Taskbar Icon Integration
+
+The app icon (military olive crosshair) appears in the taskbar/dash on both Windows and Linux:
+
+- **Windows**: `SetCurrentProcessExplicitAppUserModelID` is called before `QApplication` creation so Windows groups the app under its own identity (not `python.exe`). The `.exe` icon is set via the PyInstaller spec (`icon=assets/icons/se5editor.ico`).
+- **Linux**: At startup, a `.desktop` file and hicolor icons are installed to `~/.local/share/` (no root needed). `setDesktopFileName` maps the window to the desktop entry so GNOME 46+ and Wayland compositors can find the icon. `setWindowIcon` sets `_NET_WM_ICON` for X11 fallback.
+
+App identity: `com.tinyunicornmaker.se5editor`
+
 ## Dependencies
 
 - Python 3.12+
