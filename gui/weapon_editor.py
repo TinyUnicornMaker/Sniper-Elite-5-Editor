@@ -40,11 +40,11 @@ NON_WEAPON_ENTITIES = set(
 WEAPON_FLOAT_PROPS = [
     # ── Core stats ──
     ("Effective Range", "EffectiveRange", 0, 100000, 0, 10,
-     "Maximum range at which the weapon deals full damage (meters)", "stats"),
+     "Stored reach in metres. Not infantry HP.", "stats"),
     ("Muzzle Velocity", "MuzzleVelocity", 0, 100000, 0, 10,
      "Bullet speed — higher means less lead needed (m/s)", "stats"),
     ("Damage", "Damage", 0, 100000, 1, 1,
-     "Base damage per hit. Shotguns: damage per pellet.", "stats"),
+     "Listed score — not infantry HP. Prefer Power × on the magazine.", "stats"),
     ("Damage Spread", "DamageSpread", 0, 100000, 1, 1,
      "Secondary damage/spread value. For shotguns, may represent pellet spread.", "stats"),
     ("Wind Drop", "WindDrop", 0, 100, 4, 0.001,
@@ -64,9 +64,9 @@ WEAPON_FLOAT_PROPS = [
      "Horizontal sway per shot.", "recoil"),
     ("Recoil Multiplier", "RecoilMult", 0, 1000, 3, 0.1,
      "Global multiplier applied to all recoil values.", "recoil"),
-    ("Recoil Recovery Time", "RecoilRecoveryTime", 0, 1000, 2, 0.1,
-     "Time for recoil to settle. WARNING: high values can cause "
-     "reload animation bugs.", "recoil"),
+    ("Recoil Recovery Time", "RecoilRecoveryTime", -100, 1000, 2, 0.1,
+     "Time for recoil to settle. Can be slightly negative (Sten = −0.6). "
+     "WARNING: high values can cause reload animation bugs.", "recoil"),
     ("Recoil Reset Speed", "RecoilResetSpeed", 0, 10000, 3, 0.1,
      "How fast the crosshair resets after recoil.", "recoil"),
     # ── Aim / Scope ──

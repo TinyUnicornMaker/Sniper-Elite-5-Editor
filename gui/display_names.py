@@ -51,8 +51,11 @@ DISPLAY_NAMES: dict[str, str] = {
     'G43_DefaultIronsight': 'Gewehr 1943',
     'G43_DefaultMagazine': 'Gewehr 1943',
     'G43_Kurz_Silenced': 'Gewehr 1943 Kurz Silenced',
-    'G43_LongBarrel': 'Gewehr 1943',
+    'G43_LongBarrel': 'Extended Marksmen Barrel',
     'GEW_98_Overpressure': 'Gew98 Overpressure Magazine',
+    'Kurz_Conversion': 'Kurz Conversion',
+    'Mg13_trench': 'MG13 Trench Magazine',
+    'Magazine_pouch': 'Magazine Pouch',
     'Geret_06_Experimental_P_Plus': 'Geret 06 Overpressure Magazine',
     'GreaseGun': 'M3 Grease Gun',
     'GreaseGun_DefaultIronsight': 'M3 Grease Gun',
@@ -69,7 +72,14 @@ DISPLAY_NAMES: dict[str, str] = {
     'Gustav_DefaultIronsight': 'Carl Gustav Iron Sights',
     'HDM_DefaultIronsight': 'High Standard .22 (HS.22)',
     'Heat_Sink_Barrel': 'Hi-Rate Heat Sink Barrel',
-    'Heavy_Barrel_Bands': 'Heavy Parkerized Barrel',
+    # In-game short name is "Overpressure Power" (loc hash via entity tags).
+    # Must NOT share the Parkerized label — that caused duplicate barrel entries.
+    'Heavy_Barrel_Bands': 'Overpressure Power',
+    'Reinforced_Barrel': 'Overpressure Power',
+    'Parkerized_Heavy_Barrel': 'Heavy Parkerized',
+    'Blued_Lightened_Barrel': 'Lightened and Blued',
+    'Lightened_Barrel': 'Lightened and Stripped',
+    'Lightened_Blued_Shotgun_Barrel': 'Lightened and Blued',
     'Heavy_Mp44_Stock': 'Walnut Stability Stock',
     'Heavy_Wooden_Stock': 'Heavy Walnut Construction',
     'Hub_23_Suppressor': 'Hub 23 Suppressor',
@@ -81,8 +91,6 @@ DISPLAY_NAMES: dict[str, str] = {
     'Kar98k_DefaultIronsight': 'Karabiner 98 Iron Sights',
     'Kar98k_DefaultMagazine': 'Karabiner 98 Standard Magazine',
     'Lee_Enfield': 'Lee No.4',
-    'Lightened_Barrel': 'Lightened and Blued Barrel Liner',
-    'Lightened_Blued_Shotgun_Barrel': 'Lightened and Blued Barrel Liner',
     'Lightened_Elm_Construction': 'Light Elm Construction',
     'Lightened_Firing_Mechanism': 'Lightened Receiver Mechanism',
     'Lightweight_712s': 'Lightweight 712S Stock',
@@ -103,8 +111,12 @@ DISPLAY_NAMES: dict[str, str] = {
     'M1Carbine_DefaultIronsight': 'M1a Carbine',
     'M1Carbine_LongBarrel': 'M1a Carbine',
     'M1_Carbine_DefaultMagazine': 'M1a Carbine Standard Magazine',
-    'M1_Enfield': 'M1 SOE Suppressor',
+    'M1_Enfield': 'M1 Enfield',
+    'M12': 'Model 1912',
     'M712': 'Mod.712',
+    'EMP': 'ERMA.36',
+    'HDM': 'High Standard .22 (HS.22)',
+    'P38': 'Walther P38',
     'M81_Scope': 'M81 Scope',
     'M84_Scope': 'M84 Telescopic Scope',
     'MG42': 'MG42',
@@ -146,7 +158,9 @@ DISPLAY_NAMES: dict[str, str] = {
     'PPSh_DefaultMagazine': 'PPSh Standard Magazine',
     'PU_scope': 'PU Scope',
     'Panzerfaust': 'Panzerfaust',
-    'Parkerized_Heavy_Barrel': 'Heavy Parkerized Barrel',
+    'Pzb39Ammo': 'PzB 39 Anti-Tank Rounds',
+    'MG42(HalfAmmo)': 'MG42 (Half Ammo)',
+
     'Pedersen': 'Pedersen Rifle',
     'Pedersen_LongBarrel': 'Pedersen Rifle',
     'Pedersen_ShortBarrel': 'Pedersen Rifle',
@@ -178,8 +192,35 @@ DISPLAY_NAMES: dict[str, str] = {
     'SREM_LongBarrel': 'SREM-1',
     'SREM_ShortBarrel': 'SREM-1',
     'Sjogren': 'Sjögren Inertia',
-    'Sjogren_DefaultIronsight': 'Sjögren Inertia',
-    'Sjogren_DefaultMagazine': 'Sjögren Inertia',
+    'Sjogren_DefaultIronsight': 'Sjögren Iron Sights',
+    'Sjogren_DefaultMagazine': 'Sjögren Standard Magazine',
+    # Shotgun stock / receiver (match in-game customization labels)
+    'Heavy_Steel_Buttplate': 'Heavy Buttplate',
+    'Rubber_Buttplate': 'Rubber Buttplate',
+    'Leather_cheek_pad': 'Leather Pad',
+    'Wooden_Cheek_Pad': 'Wooden Pad',
+    'Shotgun_Shell_Loops': 'Shell Loops',
+    'Bullet_Loops': 'Shell Loops',
+    'Heavy_Steel_Assembly': 'Heavy Steel Assembly',
+    'Lightened_Firing_Mechanism': 'Lightened Assembly',
+    'Quick_Load_Mod': 'Quick Load Mod',
+    'Quick_Load_Mod_Sjogren': 'Quick Load Mod',
+    'Quick_Load_Mod_M12': 'Quick Load Mod',
+    'Shotgun_12G_Compensator': '12G Compensator',
+    'Shotgun_12G_Compensator_Sjogren': '12G Compensator',
+    'Cuts_Modified_Choke': 'Cuts Choke',
+    'Cuts_Modified_Choke_Sjogren': 'Cuts Choke',
+    'Cuts_Modified_Choke_Drilling': 'Cuts Choke',
+    'Cuts_Full_Choke': 'Cuts Full Choke',
+    'Cuts_Full_Choke_Sjogren': 'Cuts Full Choke',
+    'Cuts_Full_Choke_Drilling': 'Cuts Full Choke',
+    'Adapted_Higins_Full_Choke': 'Higins Range Choke',
+    'Adapted_Higins_Full_Choke_Sjogren': 'Higins Range Choke',
+    'Adapted_Higins_Full_Choke_Drilling': 'Higins Range Choke',
+    'Improved_Cylinder_Choke': 'Improved Cylinder',
+    'Improved_Cylinder_Choke_Sjogren': 'Improved Cylinder',
+    'Lightened_Blued_Shotgun_Barrel': 'Lightened and Blued Barrel',
+    'Smoothbore_Barrel': 'Polished Smoothbore Barrel',
     'Smoothbore_Barrel': 'Polished Smoothbore Barrel',
     'Snail_Magazine': 'Extended Snail Magazine',
     'Springfield_DefaultMagazine': 'M.1903 Standard Magazine',
@@ -199,13 +240,53 @@ DISPLAY_NAMES: dict[str, str] = {
     'Thompson_DefaultIronsight': 'M1A1 Gov. Iron Sights',
     'Thompson_DefaultMagazine': 'M1A1 Gov. Standard Magazine',
     'Thompson_Plus': 'M1A1 Gov. (Extended)',
-    'Type1': 'Type 100',
+    'Type1': 'Type TERA 1',
     'Type100': 'Type 100',
-    'Type100_DefaultIronsight': 'Type 100',
-    'Type100_DefaultMagazine': 'Type 100',
-    'Type1_DefaultIronsight': 'Type 100 Iron Sights',
-    'Type1_LongBarrel': 'Type 100 Long Barrel',
-    'Type1_ShortBarrel': 'Type 100 Short Barrel',
+    'Type100_DefaultIronsight': 'Type 100 Iron Sights',
+    'Type100_DefaultMagazine': 'Type 100 Standard Magazine',
+    'Type1_DefaultIronsight': 'Type TERA 1 Iron Sights',
+    'Type1_LongBarrel': 'Type TERA 1 Long Barrel',
+    'Type1_ShortBarrel': 'Type TERA 1 Short Barrel',
+    'Model2_Night_Vision_Scope': 'Model 2 Night Vision Scope',
+    'PK_Berlin_Scope': 'PK Berlin Scope',
+    'PPCo_Scope': 'PPCo Scope',
+    'Zf39_Scope': 'ZF39 Scope',
+    'Type99_LMG_Scope': 'Type 99 LMG Scope',
+    'PU_scope_Mosin': 'PU Scope (Mosin)',
+    'Sten_Mk2_Special_Silencer': 'Sten Mk2 Special Silencer',
+    'Cuts_Modified_Choke_Sjogren': 'Cuts Modified Choke',
+    'Ridged_Pistol_Handgrip': 'Ridged Pistol Handgrip',
+    'Ridged_SMG_Handgrip': 'Ridged SMG Handgrip',
+    'Tactical_Pistol_Handgrip': 'Tactical Pistol Handgrip',
+    'Tactical_SMG_Handgrip': 'Tactical SMG Handgrip',
+    'Tanned_draw_grip': 'Tanned Draw Grip',
+    'Reduced_load_magazine': 'Reduced Load Magazine',
+    'FG_Compensator': 'FG Compensator',
+    'Halcon_Compensator': 'Halcon Compensator',
+    'Shotgun_12G_Compensator': '12G Compensator',
+    'Shotgun_12G_Compensator_Sjogren': '12G Compensator',
+    'Modified_12G_Compensator': 'Modified 12G Compensator',
+    'SS_Flash_Hider': 'SS Flash Hider',
+    'Heavy_Walnut_Construction': 'Heavy Walnut Construction',
+    'Heavy_Oak': 'Heavy Oak Construction',
+    'Heavy_Steel_Assembly': 'Heavy Steel Assembly',
+    'Laminated_Beech_Construction': 'Laminated Beech Construction',
+    'Fixed_Frame': 'Fixed Frame',
+    'Large_9mm_Stick': 'Large 9mm Stick Magazine',
+    'Large_Extended_Single_Stack': 'Large Extended Single Stack',
+    'Medium_Extended_Single_Stack': 'Medium Extended Single Stack',
+    'Small_Stick': 'Small Stick Magazine',
+    'PPlus_Stick': 'P+ Stick Magazine',
+    '30rd_Thompson_Stick': '30rd Thompson Stick',
+    '25Rd_Marksmen_Mp44_Mag': '25rd Marksmen MP44 Magazine',
+    'PPSH_50d_Drum': 'PPSh 50rd Drum',
+    '100rd_Drum': '100rd Drum',
+    '11rd_Delisle': '11rd D.L. Magazine',
+    '20rd_delisle': '20rd D.L. Magazine',
+    'M1_10rd': 'M1 10rd Magazine',
+    'Quick_Load_Mod': 'Quick Load Mod',
+    'Quick_Load_Mod_M12': 'Quick Load Mod',
+    'Quick_Load_Mod_Sjogren': 'Quick Load Mod',
     'USGI_MuzzleBreak': 'USGI Muzzle Brake',
     'US_1911_Foregrip': 'OSS 1911 Recoil Foregrip',
     'Webley': 'Mk VI Revolver',
@@ -231,11 +312,35 @@ DISPLAY_NAMES: dict[str, str] = {
 }
 
 
+# Runtime overrides from loadout HTXT + entity loc hashes (set on game open)
+_GAME_LOC_NAMES: dict[str, str] = {}
+
+
+def set_game_loc_names(names: dict[str, str]) -> None:
+    """Install in-game short names decoded from loadout.asr_en (entity loc hashes)."""
+    global _GAME_LOC_NAMES
+    _GAME_LOC_NAMES = dict(names)
+
+
 def get_display_name(entity_name: str) -> str:
-    """Return the in-game display name for an entity, or the raw name if unknown."""
+    """Return the in-game display name for an entity, or the raw name if unknown.
+
+    Prefer names decoded from the game's loadout HTXT (via attachment loc
+    hashes) over the static table — that is what the customization UI shows.
+    """
+    if entity_name in _GAME_LOC_NAMES:
+        return _GAME_LOC_NAMES[entity_name]
+    # Default slot placeholders match in-game "Standard" / "Iron Sights"
+    low = entity_name.lower()
+    if low.endswith("defaultironsight") or low.endswith("_defaultironsight"):
+        return "Iron Sights"
+    if low.endswith("defaultbarrel") or low.endswith("_defaultbarrel"):
+        return "Standard"
+    if low.endswith("defaultmagazine") or low.endswith("_defaultmagazine"):
+        return "Standard Issue"
     return DISPLAY_NAMES.get(entity_name, entity_name)
 
 
 def format_entity_label(entity_name: str) -> str:
     """Return the in-game display name for an entity, or the raw name if unknown."""
-    return DISPLAY_NAMES.get(entity_name, entity_name)
+    return get_display_name(entity_name)

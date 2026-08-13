@@ -30,17 +30,18 @@ from asr import AsrFile
 
 AMMO_FLOAT_PROPS = [
     # ── Damage ──
-    ("Damage", "Damage", 0, 100000, 6, 0.001,
-     "Base damage per hit. Values vary widely — pistols/SMGs are typically "
-     "0.01-0.5, rifles 100-250.", "damage"),
-    ("Damage Spread", "DamageSpread", 0, 100000, 6, 0.001,
-     "Secondary damage/spread value. Affects pellet spread for shotguns "
-     "or damage variance.", "damage"),
-    ("Damage Dropoff", "DamageDropoff", 0, 100000, 6, 0.001,
-     "Distance at which damage begins to fall off.", "damage"),
+    ("Listed Damage", "Damage", 0, 100000, 6, 0.001,
+     "Listed score — not infantry HP. 0 or 3× stock does not change "
+     "how shots kill. Prefer Power × (DamageMod) on magazines.", "damage"),
+    ("2nd Score / Spread", "DamageSpread", 0, 100000, 6, 0.001,
+     "Second listed score (rifles 75–150) or a tiny cone term "
+     "(Sjögren 0.025). Two encodings, not one unit.", "damage"),
+    ("Drop-off / Alt. Score", "DamageDropoff", 0, 100000, 6, 0.001,
+     "Alternate listed score on some bolt rifles (145–150) or a "
+     "~1.0 fraction on others. Not kill HP.", "damage"),
     # ── Ballistics ──
     ("Effective Range", "EffectiveRange", 0, 100000, 3, 1,
-     "Maximum range at which the weapon deals full damage (meters).", "ballistics"),
+     "Range contribution in metres. Not infantry HP.", "ballistics"),
     ("Muzzle Velocity", "MuzzleVelocity", 0, 100000, 3, 1,
      "Bullet speed (m/s). Higher = flatter trajectory, less lead needed.", "ballistics"),
     ("Fire Rate", "FireRate", 0, 10000, 3, 1,

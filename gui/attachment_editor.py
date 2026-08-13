@@ -29,11 +29,11 @@ from asr import AsrFile
 ATTACHMENT_FLOAT_PROPS = [
     # ── Core stats ──
     ("Effective Range", "EffectiveRange", 0, 100000, 0, 10,
-     "Maximum range at which the weapon deals full damage (meters)", "stats"),
+     "Range contribution in metres. Not infantry HP.", "stats"),
     ("Muzzle Velocity", "MuzzleVelocity", 0, 100000, 0, 10,
      "Bullet speed (m/s)", "stats"),
     ("Damage", "Damage", 0, 100000, 1, 1,
-     "Base damage per hit.", "stats"),
+     "Listed score — not infantry HP. Prefer Power × (DamageMod).", "stats"),
     ("Damage Spread", "DamageSpread", 0, 100000, 1, 1,
      "Secondary damage/spread value.", "stats"),
     ("Wind Drop", "WindDrop", 0, 100, 4, 0.001,

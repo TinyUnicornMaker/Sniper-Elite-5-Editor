@@ -17,6 +17,8 @@ Color palette (tactical field):
 - BORDER_LIGHT #6a8a5a   soft highlight edge
 - ERROR        #ff6b6b   error
 - SUCCESS      #6bcf8e   success
+- PLAYER_WEAPON #7ec8e0  loadout / gunsmith weapons
+- LEVEL_WEAPON #e0a060   mission pickups
 """
 from __future__ import annotations
 
@@ -44,6 +46,9 @@ SUCCESS = "#6bcf8e"
 WARNING = "#e8c84a"
 WARNING_BG = "#2a2a14"
 WARNING_BORDER = "#8a7a20"
+# Weapon browser: loadout / gunsmith guns vs mission pickups
+PLAYER_WEAPON = "#7ec8e0"
+LEVEL_WEAPON = "#e0a060"
 
 _GLASS_BORDER = "rgba(160, 180, 120, 0.25)"
 _GLASS_PANEL = "rgba(35, 43, 29, 0.65)"

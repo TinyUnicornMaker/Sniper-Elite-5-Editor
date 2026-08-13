@@ -1,33 +1,80 @@
-"""Main window for Sniper Elite 5 Editor — tabbed interface."""
+"""Main window for Sniper Elite 5 Editor — weapon browser + Sniper Tweaks."""
 from __future__ import annotations
 
 import os
 import sys
-import shutil
-from datetime import datetime
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtCore import Qt, QSettings, QTimer
+from PySide6.QtGui import QAction, QKeySequence, QFont
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QDialog,
     QTabWidget, QPushButton, QLabel, QStatusBar, QToolBar,
     QFileDialog, QMessageBox, QApplication, QProgressBar,
-    QComboBox,
+    QDialogButtonBox, QScrollArea, QFrame,
 )
 
-from asr import AsrFile
-from gui.weapon_editor import WeaponEditorPanel
-from gui.scope_editor import ScopeEditorPanel
-from gui.attachment_editor import AttachmentEditorPanel
-from gui.ammo_editor import AmmoEditorPanel
-from asr import (
-    BARREL_ENTITIES, MAGAZINE_ENTITIES, IRONSIGHT_ENTITIES,
-    SUPPRESSOR_ENTITIES, CHOKE_ENTITIES, OTHER_ATTACHMENT_ENTITIES,
-)
+from asr import AsrFile, find_sibling_base_asr
+from gui.asr_backup import ensure_backup, restore_backup
+from gui.theme import TEXT, ACCENT
+from gui.weapon_browser import WeaponBrowserPanel
+from gui.sniper_tweaks import SniperTweaksPanel
+
+# Research / documentation modules (not wired into the UI):
+#   gui.player_stats, gui.player_catalog, gui.player_io
+#   gui.save_difficulty_panel, gui.save_difficulty
+#   gui.enemy_modifiers, gui.enemy_catalog, gui.ai_tree
+
+# First-launch limitations notice. Bump the key if the text must be
+# shown again after a major honesty / capability change.
+_LIMITATIONS_SETTINGS_KEY = "ui/limitations_ack_v1"
+
+# Compact sections: (heading, list of short bullets)
+_LIMITATIONS_SECTIONS: list[tuple[str, list[str]]] = [
+    (
+        "The short version",
+        [
+            "SE5 is opaque — many field labels do not match combat.",
+            "This editor can still edit the patch; results are uneven.",
+        ],
+    ),
+    (
+        "Damage edits are unreliable",
+        [
+            "Kills come from hit location (head / heart / lungs).",
+            "Custom Difficulty → Enemy Resilience also matters.",
+            "Loaded ammo type matters (Soft Point, AP, Match, Non-Lethal…).",
+            "“Damage” / “Power” fields often do little or nothing to kills.",
+            "Treat damage-related numbers as experimental.",
+        ],
+    ),
+    (
+        "What usually still works",
+        [
+            "Magazine capacity on the magazine entity (real mag size).",
+            "Scope Zoom Min / Max on many optics.",
+            "Handling feel: recoil, sway, range, velocity, audible range.",
+        ],
+    ),
+    (
+        "Shared parts",
+        [
+            "Scopes, magazines, barrels, suppressors are shared records.",
+            "One edit applies to every gun that can equip that part.",
+        ],
+    ),
+    (
+        "After you edit",
+        [
+            "Save the patch, then fully quit and relaunch SE5.",
+            "Use Restore from Backup if something breaks.",
+            "Reopen this notice anytime: Help → Limitations.",
+        ],
+    ),
+]
 
 
 class MainWindow(QMainWindow):
-    """Main application window with tabbed editor panels."""
+    """Main application window with weapon browser and Sniper Tweaks."""
 
     def __init__(self):
         super().__init__()
@@ -39,11 +86,15 @@ class MainWindow(QMainWindow):
         self.backup_path: str = ""
         self._is_modified = False
         self._info_shown = False  # Show the ASR guide popup only once per session
+        self._limitations_pending = False
 
         self._build_ui()
         self._build_menu()
         self._refresh_status()
         self._update_window_title()
+        # First-launch honesty notice (once per install; Help can re-show)
+        if not QSettings().value(_LIMITATIONS_SETTINGS_KEY, False, type=bool):
+            self._limitations_pending = True
 
     def _build_ui(self):
         central = QWidget()
@@ -56,10 +107,14 @@ class MainWindow(QMainWindow):
         toolbar.setMovable(False)
         self.addToolBar(toolbar)
 
-        self.load_action = QAction("Open ASR File", self)
-        self.load_action.setShortcut(QKeySequence("Ctrl+O"))
-        self.load_action.triggered.connect(self._open_file)
-        toolbar.addAction(self.load_action)
+        self.open_game_action = QAction("Open Game Folder…", self)
+        self.open_game_action.setShortcut(QKeySequence("Ctrl+O"))
+        self.open_game_action.setToolTip(
+            "Select the Sniper Elite 5 install (or its misc/ folder). "
+            "The editor finds common.asr.asrpatch and common.asr automatically."
+        )
+        self.open_game_action.triggered.connect(self._open_game_folder)
+        toolbar.addAction(self.open_game_action)
 
         toolbar.addSeparator()
 
@@ -78,7 +133,10 @@ class MainWindow(QMainWindow):
         toolbar.addSeparator()
 
         self.restore_action = QAction("Restore from Backup", self)
-        self.restore_action.setToolTip("Restore the file from the .bak backup")
+        self.restore_action.setToolTip(
+            "Restore the open weapon patch and/or common.asr from a "
+            "validated .bak. A damaged backup is refused."
+        )
         self.restore_action.triggered.connect(self._restore_backup)
         self.restore_action.setEnabled(False)
         toolbar.addAction(self.restore_action)
@@ -91,72 +149,19 @@ class MainWindow(QMainWindow):
         self._progress.setVisible(False)
         toolbar.addWidget(self._progress)
 
-        # Global preset bar (above tabs)
-        preset_bar = QHBoxLayout()
-        preset_bar.addWidget(QLabel("Global Preset:"))
-        self.preset_combo = QComboBox()
-        self.preset_combo.setMinimumWidth(260)
-        self.preset_combo.addItem("— Select Preset —", "")
-        self.preset_combo.addItem("Default (Reset All to Original)", "default")
-        self.preset_combo.addItem("Extended Strengths & Weaknesses", "extended_sw")
-        self.preset_combo.setEnabled(False)
-        preset_bar.addWidget(self.preset_combo)
-
-        self.apply_all_btn = QPushButton("Apply to All & Save")
-        self.apply_all_btn.setToolTip(
-            "Apply the selected preset to ALL weapons, scopes, and attachments\n"
-            "at once, then save the file automatically.\n\n"
-            "Extended: exaggerates strengths (1.2x–1.5x) and slightly worsens\n"
-            "weaknesses (10–20%) for every item.\n"
-            "Default: resets ALL items to their original values."
-        )
-        self.apply_all_btn.setEnabled(False)
-        self.apply_all_btn.clicked.connect(self._global_apply_preset)
-        preset_bar.addWidget(self.apply_all_btn)
-
-        preset_bar.addStretch()
-        layout.addLayout(preset_bar)
-
-        # Tab widget
+        # Tab widget — weapon browser + sniper tweaks
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs)
 
-        # Create panels
-        self.weapon_panel = WeaponEditorPanel()
-        self.weapon_panel.modified.connect(self._on_modified)
-        self.tabs.addTab(self.weapon_panel, "Weapons")
+        self.weapon_browser = WeaponBrowserPanel()
+        self.weapon_browser.modified.connect(self._on_modified)
+        self.tabs.addTab(self.weapon_browser, "Weapon Browser")
 
-        self.scope_panel = ScopeEditorPanel()
-        self.scope_panel.modified.connect(self._on_modified)
-        self.tabs.addTab(self.scope_panel, "Scopes")
-
-        self.barrel_panel = AttachmentEditorPanel(BARREL_ENTITIES, "Barrel")
-        self.barrel_panel.modified.connect(self._on_modified)
-        self.tabs.addTab(self.barrel_panel, "Barrels")
-
-        self.magazine_panel = AttachmentEditorPanel(MAGAZINE_ENTITIES, "Magazine")
-        self.magazine_panel.modified.connect(self._on_modified)
-        self.tabs.addTab(self.magazine_panel, "Magazines")
-
-        self.suppressor_panel = AttachmentEditorPanel(SUPPRESSOR_ENTITIES, "Suppressor")
-        self.suppressor_panel.modified.connect(self._on_modified)
-        self.tabs.addTab(self.suppressor_panel, "Suppressors")
-
-        self.ironsight_panel = AttachmentEditorPanel(IRONSIGHT_ENTITIES, "Ironsight")
-        self.ironsight_panel.modified.connect(self._on_modified)
-        self.tabs.addTab(self.ironsight_panel, "Ironsights")
-
-        self.choke_panel = AttachmentEditorPanel(CHOKE_ENTITIES, "Choke")
-        self.choke_panel.modified.connect(self._on_modified)
-        self.tabs.addTab(self.choke_panel, "Chokes")
-
-        self.other_panel = AttachmentEditorPanel(OTHER_ATTACHMENT_ENTITIES, "Attachment")
-        self.other_panel.modified.connect(self._on_modified)
-        self.tabs.addTab(self.other_panel, "Stocks & Grips")
-
-        self.ammo_panel = AmmoEditorPanel()
-        self.ammo_panel.modified.connect(self._on_modified)
-        self.tabs.addTab(self.ammo_panel, "Ammo & Damage")
+        # Sniper Tweaks writes common.asr itself (glint). Do not mark the
+        # weapon patch dirty from that path — re-encoding asrpatch on Save
+        # after unrelated base-file work is a separate concern.
+        self.sniper_tweaks_panel = SniperTweaksPanel()
+        self.tabs.addTab(self.sniper_tweaks_panel, "Sniper Tweaks")
 
         # Status bar
         self.status_bar = QStatusBar()
@@ -168,7 +173,8 @@ class MainWindow(QMainWindow):
         menubar = self.menuBar()
 
         file_menu = menubar.addMenu("&File")
-        file_menu.addAction(self.load_action)
+        file_menu.addAction(self.open_game_action)
+        file_menu.addSeparator()
         file_menu.addAction(self.save_action)
         file_menu.addAction(self.save_as_action)
         file_menu.addSeparator()
@@ -181,81 +187,195 @@ class MainWindow(QMainWindow):
         file_menu.addAction(exit_action)
 
         help_menu = menubar.addMenu("&Help")
+        limitations_action = QAction("Limitations…", self)
+        limitations_action.setToolTip(
+            "What this editor can and cannot change in Sniper Elite 5"
+        )
+        limitations_action.triggered.connect(
+            lambda: self._show_limitations(mark_seen=True)
+        )
+        help_menu.addAction(limitations_action)
         about_action = QAction("About", self)
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        if self._limitations_pending:
+            self._limitations_pending = False
+            # After the window is on screen so the dialog centers correctly
+            QTimer.singleShot(0, lambda: self._show_limitations(mark_seen=True))
+
+    def _show_limitations(self, mark_seen: bool = False):
+        """Honest capability notice for SE5 weapon editing."""
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Editor Limitations")
+        dlg.setModal(True)
+        # Fixed, readable size — no QMessageBox icon column waste
+        dlg.setMinimumWidth(420)
+        dlg.setMaximumWidth(480)
+        dlg.setMinimumHeight(360)
+
+        root = QVBoxLayout(dlg)
+        root.setContentsMargins(16, 14, 16, 12)
+        root.setSpacing(10)
+
+        title = QLabel("What this editor can and cannot change")
+        title_font = QFont(title.font())
+        title_font.setPointSize(12)
+        title_font.setBold(True)
+        title.setFont(title_font)
+        title.setWordWrap(True)
+        root.addWidget(title)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        body = QWidget()
+        body_layout = QVBoxLayout(body)
+        body_layout.setContentsMargins(0, 0, 4, 0)
+        body_layout.setSpacing(12)
+
+        for heading, bullets in _LIMITATIONS_SECTIONS:
+            head = QLabel(heading)
+            hf = QFont(head.font())
+            hf.setBold(True)
+            head.setFont(hf)
+            head.setStyleSheet(f"color: {ACCENT}; margin-top: 2px;")
+            body_layout.addWidget(head)
+
+            for line in bullets:
+                row = QLabel(f"•  {line}")
+                row.setWordWrap(True)
+                row.setStyleSheet(f"color: {TEXT};")
+                body_layout.addWidget(row)
+
+        body_layout.addStretch(1)
+        scroll.setWidget(body)
+        root.addWidget(scroll, 1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        buttons.accepted.connect(dlg.accept)
+        root.addWidget(buttons)
+
+        dlg.exec()
+        if mark_seen:
+            QSettings().setValue(_LIMITATIONS_SETTINGS_KEY, True)
+
     @staticmethod
-    def _default_open_dir() -> str:
-        """Best-effort guess of SE5 misc/ for the file dialog start folder."""
-        candidates = [
-            # Linux Steam (Debian/Ubuntu packaging)
-            "~/.steam/debian-installation/steamapps/common/Sniper Elite 5/misc",
-            "~/.steam/steam/steamapps/common/Sniper Elite 5/misc",
-            "~/.local/share/Steam/steamapps/common/Sniper Elite 5/misc",
-            # Windows Steam defaults
-            r"C:\Program Files (x86)\Steam\steamapps\common\Sniper Elite 5\misc",
-            r"C:\Program Files\Steam\steamapps\common\Sniper Elite 5\misc",
-            # Windows env-based
+    def _game_install_candidates() -> list[str]:
+        """Likely Sniper Elite 5 install roots (and misc/ subfolders)."""
+        return [
+            # Linux Steam
+            "~/.steam/debian-installation/steamapps/common/Sniper Elite 5",
+            "~/.steam/steam/steamapps/common/Sniper Elite 5",
+            "~/.local/share/Steam/steamapps/common/Sniper Elite 5",
+            # Windows Steam
+            r"C:\Program Files (x86)\Steam\steamapps\common\Sniper Elite 5",
+            r"C:\Program Files\Steam\steamapps\common\Sniper Elite 5",
             os.path.expandvars(
-                r"%ProgramFiles(x86)%\Steam\steamapps\common\Sniper Elite 5\misc"
+                r"%ProgramFiles(x86)%\Steam\steamapps\common\Sniper Elite 5"
             ),
             os.path.expandvars(
-                r"%ProgramFiles%\Steam\steamapps\common\Sniper Elite 5\misc"
+                r"%ProgramFiles%\Steam\steamapps\common\Sniper Elite 5"
             ),
         ]
-        for c in candidates:
-            path = os.path.expanduser(c)
+
+    @classmethod
+    def _default_open_dir(cls) -> str:
+        """Best-effort guess of SE5 install / misc for the folder dialog."""
+        for c in cls._game_install_candidates():
+            # expandvars for %ProgramFiles(x86)% etc. on Windows; expanduser
+            # for ~/… on Linux. Harmless no-ops when already absolute.
+            path = os.path.expanduser(os.path.expandvars(c))
             if path and os.path.isdir(path):
                 return path
+            misc = os.path.join(path, "misc") if path else ""
+            if misc and os.path.isdir(misc):
+                return misc
         return os.path.expanduser("~")
 
-    def _open_file(self):
-        # Show info popup explaining which files are needed (only once per session)
+    @staticmethod
+    def _find_asrpatch_in_dir(directory: str) -> str | None:
+        """Locate common.asr.asrpatch under *directory* or directory/misc."""
+        if not directory or not os.path.isdir(directory):
+            return None
+
+        # Direct hits (user picked misc/ or the install root)
+        candidates = [
+            os.path.join(directory, "common.asr.asrpatch"),
+            os.path.join(directory, "misc", "common.asr.asrpatch"),
+        ]
+        # Also accept if they selected a parent that contains "Sniper Elite 5"
+        parent_misc = os.path.join(directory, "Sniper Elite 5", "misc",
+                                   "common.asr.asrpatch")
+        candidates.append(parent_misc)
+
+        for path in candidates:
+            if os.path.isfile(path):
+                return os.path.normpath(path)
+
+        # Shallow scan: look one level deep for misc/common.asr.asrpatch
+        try:
+            for name in os.listdir(directory):
+                sub = os.path.join(directory, name)
+                if not os.path.isdir(sub):
+                    continue
+                hit = os.path.join(sub, "common.asr.asrpatch")
+                if os.path.isfile(hit):
+                    return os.path.normpath(hit)
+                hit = os.path.join(sub, "misc", "common.asr.asrpatch")
+                if os.path.isfile(hit):
+                    return os.path.normpath(hit)
+        except OSError:
+            pass
+        return None
+
+    def _open_game_folder(self):
+        """Let the user pick the game install; auto-find required ASR files."""
         if not self._info_shown:
             self._info_shown = True
             QMessageBox.information(
-                self, "Which ASR File Do I Need?",
-                "<h3>ASR File Guide</h3>"
-                "<p>To edit weapon and scope stats, you need to open:</p>"
-                "<ul>"
-                "<li><b>common.asr.asrpatch</b> — Weapons, scopes, suppressors, "
-                "magazines, barrels, and all gameplay stats.<br>"
-                "<i>This is the only file the editor supports.</i></li>"
-                "</ul>"
-                "<p><b>Location (inside the game install):</b></p>"
-                "<p><code>Sniper Elite 5\\misc\\common.asr.asrpatch</code></p>"
-                "<p>Typical Steam path on Windows:</p>"
-                "<p><code>C:\\Program Files (x86)\\Steam\\steamapps\\common\\"
-                "Sniper Elite 5\\misc\\common.asr.asrpatch</code></p>"
-                "<p>The correct file is usually <b>~5–10&nbsp;MB</b> "
-                "(compressed) or about <b>~17&nbsp;MB</b> if another tool "
-                "left it decompressed. It is <b>not</b> the huge "
-                "<code>common.asr</code> (~489&nbsp;MB).</p>"
-                "<p>The editor will automatically create a <b>.bak</b> backup "
-                "the first time you open a file, so you can always restore "
-                "the original.</p>"
-                "<p><b>Do not open:</b> <code>common.asr</code>, "
-                "<code>common.asr_en</code>, or any <code>.pc.sounds</code> "
-                "file — those will show &quot;Unknown file format&quot; or "
-                "load incomplete data.</p>",
+                self, "Open Game Folder",
+                "Pick the <b>Sniper Elite 5</b> install (or its <b>misc</b> "
+                "folder). The editor loads <code>common.asr.asrpatch</code> "
+                "and merges <code>common.asr</code>. A <code>.bak</code> "
+                "is created on first open.",
             )
 
-        default_dir = self._default_open_dir()
-
-        # Use wildcard filters so Windows native dialogs list the file correctly.
-        # (A bare "common.asr.asrpatch" pattern without * is unreliable on Win.)
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Open common.asr.asrpatch",
-            default_dir,
-            "ASR Patch (*.asrpatch);;"
-            "common.asr.asrpatch (common.asr.asrpatch);;"
-            "All Files (*)",
+        start = self._default_open_dir()
+        directory = QFileDialog.getExistingDirectory(
+            self,
+            "Select Sniper Elite 5 install folder (or misc/)",
+            start,
         )
-        if not path:
+        if not directory:
             return
 
-        self._load_file(path)
+        patch = self._find_asrpatch_in_dir(directory)
+        if not patch:
+            QMessageBox.warning(
+                self, "Game Files Not Found",
+                f"No <code>common.asr.asrpatch</code> under "
+                f"<code>{directory}</code>. "
+                "Pick the install folder or <code>misc/</code>.",
+            )
+            return
+
+        base = find_sibling_base_asr(patch)
+        extras = []
+        extras.append(f"Patch: <code>{patch}</code>")
+        if base:
+            extras.append(f"Base: <code>{base}</code> (auto-merged)")
+        else:
+            extras.append(
+                "Base: <i>common.asr not found next to the patch "
+                "(stats will come from the patch only)</i>"
+            )
+        self.status_label.setText(f"Found {os.path.basename(patch)}")
+        self._load_file(patch)
 
     def _load_file(self, path: str):
         self._progress.setVisible(True)
@@ -265,11 +385,12 @@ class MainWindow(QMainWindow):
         try:
             new_asr = AsrFile(path)
 
-            # Create backup if it doesn't exist
+            # Snapshot only a healthy file. Never freeze a broken archive
+            # as the restore source.
             if not path.endswith(".bak"):
                 self.backup_path = path + ".bak"
-                if not os.path.exists(self.backup_path):
-                    shutil.copy2(path, self.backup_path)
+                _ok, bak_msg = ensure_backup(path)
+                if "created" in bak_msg:
                     self.status_label.setText(
                         f"Loaded {os.path.basename(path)} — backup created"
                     )
@@ -279,7 +400,6 @@ class MainWindow(QMainWindow):
                     )
             else:
                 # Opening a .bak directly: the backup IS this file.
-                # backup_path points to itself so restore is correctly disabled.
                 self.backup_path = path
                 self.status_label.setText(f"Loaded backup: {os.path.basename(path)}")
 
@@ -287,22 +407,57 @@ class MainWindow(QMainWindow):
             self.asr_file = new_asr
             self.current_path = path
 
+            # Merge base common.asr stats (fills properties the patch omits).
+            # Weapon tables live in ZBB blocks 0–1; scan is ~0.5s.
+            base_msg = ""
+            base_path = find_sibling_base_asr(path)
+            if base_path and new_asr._format in ("ZLB", "RAW"):
+                try:
+                    def _prog(frac, msg):
+                        self.status_label.setText(msg)
+                        QApplication.processEvents()
+
+                    summary = new_asr.merge_base_stats(
+                        base_path, max_blocks=2, progress_callback=_prog
+                    )
+                    base_msg = (
+                        f" · base common.asr: {summary['base_entities']} entities, "
+                        f"+{summary['merged_props']} filled props"
+                    )
+                except Exception as base_err:
+                    base_msg = f" · base merge skipped: {base_err}"
+
+            # Point attachment discovery at loadout loc + base common.asr
+            try:
+                from gui.weapon_mapping import set_game_data_paths
+                from gui.attachment_compat import discover_game_paths
+                paths = discover_game_paths(path)
+                common_for_mesh = paths.get("common_asr") or base_path
+                set_game_data_paths(
+                    loadout_dir=paths.get("loadout"),
+                    common_asr=common_for_mesh,
+                )
+            except Exception:
+                pass
+
             # Update panels
-            self.weapon_panel.set_asr_file(self.asr_file)
-            self.scope_panel.set_asr_file(self.asr_file)
-            self.barrel_panel.set_asr_file(self.asr_file)
-            self.magazine_panel.set_asr_file(self.asr_file)
-            self.suppressor_panel.set_asr_file(self.asr_file)
-            self.ironsight_panel.set_asr_file(self.asr_file)
-            self.choke_panel.set_asr_file(self.asr_file)
-            self.other_panel.set_asr_file(self.asr_file)
-            self.ammo_panel.set_asr_file(self.asr_file)
+            # If a prior block-0 rewrite left first_comp stale, later
+            # blocks (AI / glint) are unreadable and the game black-screens.
+            if base_path:
+                self._offer_restore_broken_common_asr(base_path)
+
+            self.weapon_browser.set_asr_file(self.asr_file)
+            self.sniper_tweaks_panel.set_asr_file(self.asr_file, path)
 
             self._is_modified = False
-            self.preset_combo.setEnabled(True)
-            self.apply_all_btn.setEnabled(True)
             self._refresh_actions()
             self._update_window_title()
+
+            # Preserve load status with base-merge note
+            if base_msg:
+                current = self.status_label.text()
+                if "Loaded" in current:
+                    self.status_label.setText(current + base_msg)
 
             # Warn when the wrong container was opened even if magic matched.
             base = os.path.basename(path).lower()
@@ -314,38 +469,21 @@ class MainWindow(QMainWindow):
             ):
                 QMessageBox.warning(
                     self, "Wrong File?",
-                    f"Loaded <b>{os.path.basename(path)}</b> "
-                    f"({n_ent} entities found).<br><br>"
-                    "Weapon stats should be edited in "
-                    "<b>common.asr.asrpatch</b> (in the <code>misc</code> "
-                    "folder), not the large base <code>common.asr</code>. "
-                    "Base files may load incompletely and will not match "
-                    "what the game uses for overrides.",
+                    f"Loaded <b>{os.path.basename(path)}</b> ({n_ent} entities). "
+                    "Edit <b>common.asr.asrpatch</b> in <code>misc/</code>, "
+                    "not the base <code>common.asr</code>.",
                 )
             elif getattr(new_asr, "_format", "") == "RAW" and n_ent > 0:
-                # Uncompressed body (magic 'Asura   ') — common on Windows
-                # when a tool left the patch decompressed. Save will wrap
-                # it back into AsuraZlb so the game can load it.
                 QMessageBox.information(
-                    self, "Uncompressed Patch Loaded",
-                    f"Loaded <b>{os.path.basename(path)}</b> "
-                    f"({n_ent} entities).<br><br>"
-                    "This file is the <b>uncompressed</b> Asura archive "
-                    "(header <code>Asura&nbsp;&nbsp;&nbsp;</code>) rather than "
-                    "the usual compressed <code>AsuraZlb</code> form.<br><br>"
-                    "Editing works normally. When you <b>Save</b>, the editor "
-                    "will write a proper <code>AsuraZlb</code> patch so the "
-                    "game can load your changes.",
+                    self, "Uncompressed Patch",
+                    f"Loaded {n_ent} entities from an uncompressed archive. "
+                    "Save writes a normal AsuraZlb patch.",
                 )
             elif n_ent == 0:
                 QMessageBox.warning(
-                    self, "No Weapon Data Found",
-                    f"Loaded <b>{os.path.basename(path)}</b> successfully, "
-                    f"but found <b>0</b> known weapon/attachment entities.<br><br>"
-                    "Make sure you opened:<br>"
-                    "<code>Sniper Elite 5/misc/common.asr.asrpatch</code><br><br>"
-                    "Navmesh and localization <code>.asrpatch</code> files "
-                    "are not supported.",
+                    self, "No Weapon Data",
+                    f"<b>{os.path.basename(path)}</b> has no known weapon "
+                    "entities. Use <code>misc/common.asr.asrpatch</code>.",
                 )
 
         except Exception as e:
@@ -354,14 +492,48 @@ class MainWindow(QMainWindow):
             self.current_path = ""
             self.backup_path = ""
             self._is_modified = False
-            self.preset_combo.setEnabled(False)
-            self.apply_all_btn.setEnabled(False)
             self._refresh_actions()
             self._update_window_title()
             QMessageBox.critical(self, "Error Loading File", str(e))
             self.status_label.setText(f"Error: {e}")
         finally:
             self._progress.setVisible(False)
+
+    def _offer_restore_broken_common_asr(self, base_path: str) -> None:
+        """Detect a broken ZBB index and offer to restore common.asr.bak."""
+        from gui.zbb_util import validate_zbb
+        try:
+            with open(base_path, "rb") as fh:
+                raw = fh.read()
+            err = validate_zbb(raw)
+        except Exception as exc:
+            err = str(exc)
+        if not err:
+            return
+        bak = base_path + ".bak"
+        if os.path.isfile(bak):
+            reply = QMessageBox.question(
+                self, "common.asr looks broken",
+                "The archive index in common.asr is invalid "
+                f"({err}).\n\nThis usually follows a bad block rewrite "
+                "(historical acquire-timer / lethal experiments) and "
+                "causes a black loading screen.\n\nRestore common.asr "
+                "from its .bak now?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                ok, msg = restore_backup(base_path)
+                if ok:
+                    QMessageBox.information(
+                        self, "Restored", msg + " Restart the game.")
+                else:
+                    QMessageBox.critical(self, "Restore failed", msg)
+        else:
+            QMessageBox.warning(
+                self, "common.asr looks broken",
+                f"The archive index is invalid ({err}) and no "
+                "common.asr.bak was found. Verify game files in Steam.",
+            )
 
     def _save_file(self):
         if not self.asr_file or not self.current_path:
@@ -394,14 +566,12 @@ class MainWindow(QMainWindow):
             self.current_path = path
             self._is_modified = False
 
-            # Update backup_path for the new save location (Save As).
-            # Create a fresh backup so Restore works for the new file too.
+            # Save As: snapshot the destination only if no healthy bak
+            # exists yet. Never replace a good bak with the just-saved
+            # (already edited) file.
             if not path.endswith(".bak"):
-                new_backup = path + ".bak"
-                if new_backup != self.backup_path:
-                    self.backup_path = new_backup
-                    if not os.path.exists(new_backup):
-                        shutil.copy2(path, new_backup)
+                self.backup_path = path + ".bak"
+                ensure_backup(path)
 
             self._refresh_actions()
             self._update_window_title()
@@ -413,19 +583,39 @@ class MainWindow(QMainWindow):
             self._progress.setVisible(False)
 
     def _restore_backup(self):
-        if not self.backup_path or not os.path.exists(self.backup_path):
+        targets: list[tuple[str, str]] = []
+        if self.current_path and not self.current_path.endswith(".bak"):
+            targets.append((
+                self.current_path,
+                "Weapon patch (common.asr.asrpatch) — loadout / weapon edits",
+            ))
+        base = find_sibling_base_asr(self.current_path) if self.current_path else ""
+        if base:
+            targets.append((
+                base,
+                "Base archive (common.asr) — glint, player skills",
+            ))
+        existing = [(p, label) for p, label in targets if os.path.isfile(p + ".bak")]
+        if not existing:
+            QMessageBox.warning(
+                self, "No backup",
+                "No validated .bak next to the open patch or common.asr. "
+                "After a Steam verify, reopen the game folder so a fresh "
+                "snapshot can be taken before the next edit.",
+            )
             return
-        # The original (non-bak) file is the backup path with .bak stripped.
-        # backup_path is always either "<original>.bak" or the .bak file itself.
-        if self.backup_path.endswith(".bak"):
-            original = self.backup_path[:-4]
-        else:
-            original = self.backup_path
 
+        lines = [
+            "Restore which snapshot? A damaged .bak is refused.",
+            "",
+        ]
+        for path, label in existing:
+            lines.append(f"• {os.path.basename(path)} — {label}")
+        lines.append("")
+        lines.append("Yes restores every listed file. No cancels.")
         reply = QMessageBox.question(
             self, "Restore Backup",
-            f"Restore {os.path.basename(original)} from backup?\n"
-            f"This will discard all unsaved changes.",
+            "\n".join(lines),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
@@ -434,139 +624,46 @@ class MainWindow(QMainWindow):
         self._progress.setVisible(True)
         self._progress.setRange(0, 0)
         QApplication.processEvents()
+        messages: list[str] = []
+        failed = False
         try:
-            # Copy the backup over the original file, then reload it.
-            shutil.copy2(self.backup_path, original)
-        except Exception as e:
-            QMessageBox.critical(self, "Error Restoring Backup", str(e))
-            self.status_label.setText(f"Restore error: {e}")
-            return
+            for path, _label in existing:
+                ok, msg = restore_backup(path)
+                messages.append(msg)
+                if not ok:
+                    failed = True
         finally:
             self._progress.setVisible(False)
 
-        self._load_file(original)
+        summary = "\n".join(messages)
+        if failed:
+            QMessageBox.critical(self, "Restore failed", summary)
+            self.status_label.setText("Restore failed")
+            return
+
+        reload_path = self.current_path or existing[0][0]
+        self._load_file(reload_path)
         if self.asr_file:
-            self.status_label.setText(f"Restored from backup to {original}")
-
-    def _global_apply_preset(self):
-        """Apply the selected preset to ALL panels at once, then save."""
-        if not self.asr_file:
-            return
-
-        preset_id = self.preset_combo.currentData()
-        if not preset_id:
-            QMessageBox.information(
-                self, "Select Preset",
-                "Please select a preset from the dropdown first.",
-            )
-            return
-
-        # Collect all panels and their entity names
-        panels = [
-            (self.weapon_panel, "Weapon"),
-            (self.scope_panel, "Scope"),
-            (self.barrel_panel, "Barrel"),
-            (self.magazine_panel, "Magazine"),
-            (self.suppressor_panel, "Suppressor"),
-            (self.ironsight_panel, "Ironsight"),
-            (self.choke_panel, "Choke"),
-            (self.other_panel, "Attachment"),
-            (self.ammo_panel, "Ammo"),
-        ]
-
-        # Count total entities for the confirmation message
-        total_entities = 0
-        for panel, _label in panels:
-            names = panel.get_all_entity_names()
-            total_entities += len(names)
-
-        if preset_id == "default":
-            preset_name = "Default (Reset All to Original)"
-            confirm_msg = (
-                f"Reset ALL {total_entities} items across all tabs to their\n"
-                f"original values, then save?\n\n"
-                f"This undoes every edit in every panel."
-            )
-        else:
-            preset_name = "Extended Strengths & Weaknesses"
-            confirm_msg = (
-                f"Apply 'Extended Strengths & Weaknesses' to ALL {total_entities}\n"
-                f"items across all tabs, then save?\n\n"
-                f"This will exaggerate strengths (1.2x–1.5x) and slightly worsen\n"
-                f"weaknesses (10–20%) for every weapon, scope, and attachment.\n"
-                f"You can undo with 'Restore from Backup'."
-            )
-
-        reply = QMessageBox.question(
-            self, "Apply Preset to All",
-            f"Apply '{preset_name}'?\n\n{confirm_msg}",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-
-        # Show progress
-        self._progress.setVisible(True)
-        self._progress.setRange(0, 0)
-        QApplication.processEvents()
-
-        try:
-            from gui.presets import apply_preset_to_all, reset_all_entities
-
-            total_changes = 0
-            for panel, label in panels:
-                entity_names = panel.get_all_entity_names()
-                if not entity_names:
-                    continue
-                if preset_id == "default":
-                    reset_all_entities(
-                        panel, self.asr_file, entity_names,
-                        panel_label=label,
-                    )
-                else:
-                    # Suppress the per-panel confirmation dialog
-                    from PySide6.QtWidgets import QMessageBox as _QMB
-                    _orig = _QMB.question
-                    _QMB.question = staticmethod(
-                        lambda *a, **kw: _QMB.StandardButton.Yes
-                    )
-                    try:
-                        apply_preset_to_all(
-                            panel, self.asr_file, entity_names,
-                            "extended_sw", panel_label=label,
-                        )
-                    finally:
-                        _QMB.question = _orig
-                total_changes += len(entity_names)
-
-            # Auto-save
-            self.asr_file.save(self.current_path)
-            self._is_modified = False
-            self._refresh_actions()
-            self._update_window_title()
-            self.status_label.setText(
-                f"Applied '{preset_name}' to {total_changes} items "
-                f"across all tabs — saved to {os.path.basename(self.current_path)}"
-            )
-        except Exception as e:
-            QMessageBox.critical(self, "Error Applying Preset", str(e))
-            self.status_label.setText(f"Preset error: {e}")
-        finally:
-            self._progress.setVisible(False)
+            self.status_label.setText(f"Restored from backup to {reload_path}")
+        QMessageBox.information(self, "Restored", summary)
 
     def _on_modified(self):
+        # Dirty flag alone is not enough: Save / Ctrl+S are gated by the
+        # QAction enabled state. Without _refresh_actions the status bar
+        # and close dialog see "modified" while Save stays greyed out.
         self._is_modified = True
         self.status_label.setText("Modified — press Ctrl+S to save")
+        self._refresh_actions()
         self._update_window_title()
 
     def _refresh_actions(self):
         """Enable/disable toolbar actions based on current state."""
         has_file = self.asr_file is not None
-        self.save_action.setEnabled(has_file)
+        self.save_action.setEnabled(has_file and self._is_modified)
         self.save_as_action.setEnabled(has_file)
         self.restore_action.setEnabled(
             has_file
-            and bool(self.backup_path)
+            and self.backup_path
             and os.path.exists(self.backup_path)
             and self.backup_path != self.current_path
         )
@@ -588,20 +685,15 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self, "About Sniper Elite 5 Editor",
             "<h3>Sniper Elite 5 Editor</h3>"
-            "<p>A tool for editing weapon, scope, and attachment stats "
-            "in Sniper Elite 5 ASR/ASRpatch files.</p>"
-            "<p><b>Features:</b></p>"
-            "<ul>"
-            "<li>Edit weapon damage, range, muzzle velocity, RPM</li>"
-            "<li>Adjust recoil (vertical, horizontal, recovery)</li>"
-            "<li>Modify scope-in speed and sway parameters</li>"
-            "<li>Change magazine capacity</li>"
-            "<li>Edit scope zoom levels (min/max)</li>"
-            "<li>Edit barrels, magazines, suppressors, ironsights</li>"
-            "<li>Edit chokes, stocks, grips, and muzzle brakes</li>"
-            "</ul>"
-            "<p><b>Warning:</b> Always back up your game files before modding. "
-            "Some changes (RPM, recoil, magazine) can cause animation bugs.</p>",
+            "<p>Edits weapon / attachment stats in "
+            "<code>common.asr.asrpatch</code> and scope glint in "
+            "<code>common.asr</code>.</p>"
+            "<p>Sniper Elite 5 is opaque: many “damage” fields do not "
+            "control kills. See <b>Help → Limitations</b> for an honest "
+            "list of what still works (capacity, magnification, shared "
+            "parts).</p>"
+            "<p>Back up game files first. RPM, recoil, and magazine size "
+            "can break animations. Fully restart the game after Save.</p>",
         )
 
     def closeEvent(self, event):
@@ -615,7 +707,6 @@ class MainWindow(QMainWindow):
             )
             if reply == QMessageBox.StandardButton.Save:
                 self._save_file()
-                # If the save failed, _is_modified is still True — don't close.
                 if self._is_modified:
                     event.ignore()
                     return
