@@ -88,6 +88,14 @@ def _install_linux_desktop_entry():
     apps_dir.mkdir(parents=True, exist_ok=True)
     desktop_path = apps_dir / f"{APP_ID}.desktop"
 
+    # Remove legacy desktop file from older versions so only one entry shows
+    legacy = apps_dir / "se5editor.desktop"
+    if legacy.exists():
+        try:
+            legacy.unlink()
+        except OSError:
+            pass
+
     # Install icons into the user hicolor theme
     icons_src = os.path.join(_ROOT, "assets", "icons", "hicolor")
     icons_dst_base = home / ".local" / "share" / "icons" / "hicolor"
