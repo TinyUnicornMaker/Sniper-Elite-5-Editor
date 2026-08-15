@@ -80,8 +80,9 @@ def _install_linux_desktop_entry():
         # PyInstaller bundle — use the actual executable
         exe_path = os.path.abspath(sys.executable)
     else:
-        # Running from source — use the script path
-        exe_path = os.path.abspath(__file__)
+        # Running from source — launch via python3 so the shebang is not
+        # relied upon (some desktop environments don't honour it)
+        exe_path = f"python3 {os.path.abspath(__file__)}"
 
     home = Path.home()
     apps_dir = home / ".local" / "share" / "applications"
