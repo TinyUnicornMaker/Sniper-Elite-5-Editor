@@ -24,6 +24,14 @@ Kills in SE5 are **hit location** (head / heart / lungs drop anyone) × Custom D
 | `Damage` | `0xFFEBCB07` | Listed score. Rifles/AT ~100–250; SMG/pistol/Sjögren stock ~0.05–0.5; Super Thompson 2000. Many bolt rifles **omit** it in the patch. Playtest: 0 / 3× / Sjögren 20 = same kills. |
 | `DamageSpread` | `0x171B12B6` | Second listed score. Rifles 75–150 sit next to `Damage` (M.1903 135 beside 130). Sjögren 0.025 looks like a pellet/cone term. **Two encodings, not one unit.** |
 | `DamageDropoff` | `0x83BC523F` | Alternate listed score on Kar98K / Mosin / Lee Enfield / Winchester (145–150, and those guns have no `Damage` in the patch). SREM / M12 / Welrod store ~1.0 (fraction). Not a reliable metre drop-off. |
+| `CombatDamageScore` | `0x65A440D8` (`D840A465`) | **RIFLES ONLY.** Playtested G43 (105). Kar98K 145, Winchester 235. Does nothing on pistols/SMGs/shotguns — hidden for them. |
+| `SidearmDamageScore` | `0xA02EE0D8` | ✅ **PISTOLS — VERIFIED.** Luger 43, Nambu 39, M712 34. Not shotguns/SMGs. |
+| `AltDamageScore` | `0x85E90E24` | ✅ **PISTOLS — VERIFIED.** M1911 58, Luger 43. On SMGs it's a decoy duplicate of `SMGDamageScore`. |
+| `SMGDamageScore` | `0x14F34760` | 🧪 **SMGs — PLAYTEST.** Gustaf proof (Alt 999 no-op, this 40 untouched). MP.44/Thompson 45, PPSH/Type100 34, Gustaf 40, EMP 46. |
+| `DamageMod` (on shotguns) | `0xD02587AE` | 🧪 **SHOTGUNS — PLAYTEST.** Shotgun damage score (base Sjogren 20, M12 5, Auto_Burglar 20). On rifles/mags/ammo it's a 1–2× multiplier; on shotguns it's the damage value. |
+| `ShotgunDamageScore` | `0xD1880B7B` | ❌ **DEAD.** Tested 9999 and 0 — no in-game effect. Hidden. |
+| `AmmoDamageScale` / `AmmoPowerCand` / `AmmoPenCand` | `0x0C416B3E` / `0xD0E44A75` / `0xD0E44A74` | **Playtested dead** on Soft Point — hidden from the GUI. |
+| `AmmoSoftPointCand` | `0x80553FD9` | 🧪 PLAYTEST. SoftPoint 1.5 vs Match 1.0 — best unused Soft Point cand. |
 | `DamageMod` / `DamageModB` | `0xD02587AE` / `0xD02587AF` | **Real power multipliers** on magazines, overpressure barrels, chokes, and ammo-type entities (`Match`, `ArmourPiercing`, `24Buckshot`, …). Gunsmith “Boosts Damage” / “Overpressure Power” write these. |
 | `PowerMod` | `0x00A32AA1` | Gunsmith power-bar contribution. Overpressure often stores **10–12**, not a 1.x multiplier. |
 | `PenetrationMod` | `0xD874D19C` | Penetration multiplier (~1.2 on AP / overpressure). |

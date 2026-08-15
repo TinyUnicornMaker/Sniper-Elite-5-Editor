@@ -40,7 +40,7 @@ hiddenimports = [
     'gui.asr_backup',
     'gui.zbb_util',
     'gui.deflate_patch',
-    'gui.presets',
+    'gui._version',
     # Legacy modules still imported by some code paths
     'gui.weapon_editor',
     'gui.scope_editor',

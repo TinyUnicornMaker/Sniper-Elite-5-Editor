@@ -28,7 +28,7 @@ jobs:
             artifact_ext: zip
           - os: ubuntu-22.04
             platform: linux
-            artifact_ext: tar.gz
+            artifact_ext: zip
 
     runs-on: ${{ matrix.os }}
 
@@ -53,7 +53,20 @@ jobs:
             VERSION="dev-$(echo $GITHUB_SHA | cut -c1-8)"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Building version: $VERSION"
+          # Strip a leading "v" for the numeric version (e.g. v1.2.2 -> 1.2.2)
+          NUMERIC_VERSION="${VERSION#v}"
+          echo "numeric_version=$NUMERIC_VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION (numeric: $NUMERIC_VERSION)"
+
+      - name: Inject version into VERSION file
+        shell: bash
+        run: |
+          # Write a VERSION file the app can read at runtime.
+          # se5editor.py already hardcodes APP_VERSION, but this keeps
+          # the packaged binary in sync with the git tag if it ever
+          # needs to read the version dynamically.
+          echo "${{ steps.version.outputs.numeric_version }}" > VERSION
+          echo "Wrote VERSION file: $(cat VERSION)"
 
       - name: Install system dependencies (Linux)
         if: matrix.platform == 'linux'
@@ -86,7 +99,7 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           cd dist
-          tar czf SniperElite5Editor-${{ steps.version.outputs.version }}-linux.tar.gz SniperElite5Editor
+          zip -r SniperElite5Editor-${{ steps.version.outputs.version }}-linux.zip SniperElite5Editor
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -98,14 +111,21 @@ jobs:
       - name: Smoke test (Linux)
         if: matrix.platform == 'linux'
         run: |
-          # Verify the binary starts and can import all modules
-          # (can't fully test GUI in CI, but can check imports)
+          # Verify the binary exists and key bundled files are present.
+          # (Can't fully test the Qt GUI in a headless CI runner, but we
+          # can confirm the package is structurally complete.)
           cd dist/SniperElite5Editor
-          ./SniperElite5Editor --help 2>&1 || true
-          # Check that key files are present
+          echo "Checking binary exists..."
           test -f SniperElite5Editor
+          test -x SniperElite5Editor
+          echo "Checking bundled assets..."
           test -d _internal/assets/icons/hicolor
           test -f _internal/gui/vanilla_defaults.json
+          echo "Checking Python runtime modules..."
+          test -d _internal/PySide6
+          # Attempt a non-GUI invocation; import errors will surface here.
+          # (The app may exit non-zero without a display, so we tolerate failure.)
+          ./SniperElite5Editor --help 2>&1 || true
           echo "Smoke test passed"
 
       - name: Upload to GitHub Release
@@ -116,3 +136,20 @@ jobs:
           draft: true
           generate_release_notes: true
           name: Sniper Elite 5 Editor ${{ steps.version.outputs.version }}
+          body: |
+            ## What's new in ${{ steps.version.outputs.version }}
+
+            - **Per-weapon damage field system** based on playtest results
+            - **Hidden non-editable variant stubs** from the sidebar
+            - **Renamed G43 to "Gewehr 43"** in the editor
+            - **Removed the Ammo Types tab** (unverified feature)
+            - **Simplified the "Open Game Folder" dialog** message
+            - **Version number now shown in the window title**
+
+            ---
+
+            **Downloads**
+            - Windows: `SniperElite5Editor-${{ steps.version.outputs.version }}-windows.zip`
+            - Linux: `SniperElite5Editor-${{ steps.version.outputs.version }}-linux.zip`
+
+            Extract the archive and run the `SniperElite5Editor` executable inside. No Python installation required.

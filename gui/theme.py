@@ -49,6 +49,9 @@ WARNING_BORDER = "#8a7a20"
 # Weapon browser: loadout / gunsmith guns vs mission pickups
 PLAYER_WEAPON = "#7ec8e0"
 LEVEL_WEAPON = "#e0a060"
+# Unverified / playtest-candidate fields (temporary debug highlight)
+TEST_FIELD = "#ff9f43"
+TEST_FIELD_BG = "rgba(255, 159, 67, 0.12)"
 
 _GLASS_BORDER = "rgba(160, 180, 120, 0.25)"
 _GLASS_PANEL = "rgba(35, 43, 29, 0.65)"

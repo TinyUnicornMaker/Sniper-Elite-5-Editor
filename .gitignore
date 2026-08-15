@@ -35,3 +35,8 @@ desktop.ini
 # Logs / temp
 *.log
 /tmp/
+
+# Testing / playtest data (not shipped)
+*.csv
+*.ods
+.~lock.*

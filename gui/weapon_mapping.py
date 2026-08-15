@@ -637,10 +637,31 @@ def re_ironsight(name: str) -> bool:
     return "ironsight" in n or n.endswith("_sight") and "scope" not in n
 
 
+# Weapons hidden from the sidebar per playtest results (weapons.ods):
+#   Variant stubs with no stats: M1911_Plus, Luger_Suppressed, Mk1_Welrod,
+#       Mk2_Welrod — edit the parent weapon instead.
+#   DLC_Mosin — not used by the player in game; the non-DLC Mosin_Nagant
+#       is the correct record to edit.
+#   Thompson_Plus (M1A1 Gov. Extended) — variant stub, cannot be edited.
+#   G43_Kurz_Silenced (Gewehr 1943 Kurz Silenced) — variant stub, cannot be
+#       edited. Edit G43 (Gewehr 43) instead.
+#   SuperTommy (Super Thompson) — variant stub with no useful stats (only
+#       dead/hidden fields and 0 values). Edit Thompson (M1A1 Gov.) instead.
+#   Thompson is NOT hidden — it has full stats and Thompson_Plus depends on
+#   it. SMGDamageScore is working (shown as "Damage" in property_editor).
+_HIDDEN_WEAPONS: frozenset[str] = frozenset({
+    "M1911_Plus", "Luger_Suppressed", "Mk1_Welrod", "Mk2_Welrod",
+    "DLC_Mosin", "Thompson_Plus", "G43_Kurz_Silenced", "SuperTommy",
+})
+
+
 def get_all_weapons_in_category(
     category_name: str, available_entities: set[str]
 ) -> list[str]:
     for cat_name, weapon_list in WEAPON_CATEGORIES:
         if cat_name == category_name:
-            return sorted([w for w in weapon_list if w in available_entities])
+            return sorted([
+                w for w in weapon_list
+                if w in available_entities and w not in _HIDDEN_WEAPONS
+            ])
     return []

@@ -25,7 +25,7 @@ from gui.weapon_editor import _apply_warning_style, NO_COLOR_PROPS
 # "lower_better"  — low values are a strength (e.g. Recoil, Sway, WindDrop)
 
 HIGHER_BETTER_PROPS = {
-    "EffectiveRange", "MuzzleVelocity", "Damage", "DamageDropoff",
+    "EffectiveRange", "MuzzleVelocity", "CombatDamageScore",
     "RPM", "FireRate",
     "AimStability", "ScopeSteadyTime", "HoldBreathDuration", "ScopeInSpeed",
     "SwayDecay", "SwayRecovery",
@@ -34,7 +34,7 @@ HIGHER_BETTER_PROPS = {
 }
 
 LOWER_BETTER_PROPS = {
-    "WindDrop", "DamageSpread",
+    "WindDrop",
     "Recoil1_Vertical", "Recoil2_Horizontal", "RecoilMult",
     "RecoilRecoveryTime",
     "SwayAmount", "SwayDrift", "SwayPerShot",
@@ -45,7 +45,16 @@ LOWER_BETTER_PROPS = {
 # Properties exempt from presets
 # MagazineCapacity: modifying it on non-magazine entities breaks ammo pickup
 # ZoomDefault: not shown in UI, no meaningful adjustment
-PRESET_EXEMPT_PROPS = {"MagazineCapacity", "ZoomDefault"}
+# Dead listed scores + ammo playtest candidates left stock for presets
+PRESET_EXEMPT_PROPS = {
+    "MagazineCapacity", "ZoomDefault",
+    "Damage", "DamageSpread", "DamageDropoff",
+    "AmmoDamageScale", "AmmoPowerCand", "AmmoPenCand",
+    "AmmoSpreadCand", "AmmoFactorCand", "AmmoMassCand",
+    "AmmoSoftPointCand", "AmmoSoftBoostCand", "AmmoLethalityCand",
+    "SidearmDamageScore", "AltDamageScore",
+    "SMGDamageScore", "ShotgunDamageScore",
+}
 
 
 def compute_medians(asr_file: AsrFile, entity_names: list[str]) -> dict:

@@ -255,10 +255,12 @@ AMP_ENTITY_SEED: dict[str, str] = {
 }
 
 # AMP ids that are ammo types, not attachment entities (skip for attachment UI)
+# DERRINGER_OVERPRESSURE is a MAGAZINE (Derringer overpressure tube), not an
+# ammo type — see display_names Small_Overpressure.
 AMMO_AMP_IDS = frozenset({
     "AP_FMJ_AMMO", "MATCH_FMJ_AMMO", "SOFT_POINT_AMMO", "SUBSONIC_AMMO",
     "24_BUCKSHOT_SHELLS", "36_BUCKSHOT_SHELLS", "36_BUCKSHOT_PISTOL_SHELLS",
-    "SLUG_SHELLS", "DERRINGER_OVERPRESSURE",
+    "SLUG_SHELLS",
 })
 
 # ── Slot classification ──────────────────────────────────────────────────

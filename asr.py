@@ -49,8 +49,13 @@ TYPE_STRING = 4
 # ── Known property hashes ────────────────────────────────────────────────
 # Working names from value comparison + loc tags. Several are confirmed
 # NOT to mean what the name suggests in combat (see WEAPONS.md):
-#   Damage / DamageSpread / DamageDropoff = listed scores, two encodings
-#   DamageMod = real gunsmith “power / damage” multiplier on parts/ammo
+#   Damage / DamageSpread / DamageDropoff = dead listed scores (do not kill)
+#   CombatDamageScore (0x65A440D8 / D840A465) = rifle damage (G43 playtest)
+#   SidearmDamageScore (0xA02EE0D8) / AltDamageScore (0x85E90E24) = PISTOL damage (playtested working)
+#   SMGDamageScore (0x14F34760) = SMG damage cand — matches Alt as decoy; Gustaf playtest proof
+#   ShotgunDamageScore (0xD1880B7B) = shotgun damage cand — all 3 shotguns carry it
+#   DamageMod = gunsmith power × on magazines / overpressure parts
+#   AmmoDamageScale / AmmoPowerCand / AmmoPenCand = playtested dead (hidden)
 
 # Core weapon / scope stats — safe to search in any entity window.
 CORE_HASH_NAMES: Dict[int, str] = {
@@ -83,7 +88,26 @@ CORE_HASH_NAMES: Dict[int, str] = {
     0x2C504024: "SwayProne",
     0x83BC523F: "DamageDropoff",
     0x78EFCCCF: "AudibleRangeBase",
-    # int on weapons/mags; float multiplier on many attachments
+    # Community “D840A465” — LE hash 0x65A440D8 (bytes D8 40 A4 65).
+    # Rifle damage score (playtested: G43 scales). Pistols: unconfirmed.
+    0x65A440D8: "CombatDamageScore",
+    # In the same weapon window as CombatDamageScore. Pistols/SMGs ~30–60;
+    # G43 has none (rifle path already works). Playtest for non-rifles.
+    0xA02EE0D8: "SidearmDamageScore",
+    # Often equals CombatDamageScore on rifles; M1911 stores 36 here
+    # (the value currently shown as Weapon Damage). Playtest.
+    0x85E90E24: "AltDamageScore",
+    # SMG damage score — NOT in the CDS/Side/Alt weapon window. On the 6
+    # SMGs that carry it (MP.44/Thompson/PPSH/Type100/Gustaf/EMP) it matches
+    # AltDamageScore exactly, which is why editing Alt *appears* to work but
+    # does nothing in-game — the game reads THIS hash. Proven by Gustaf:
+    # user set Alt=999 (no effect) while 0x14F34760 stayed 40.
+    0x14F34760: "SMGDamageScore",
+    # Shotgun damage score — present on ALL shotguns (Sjogren/M12=120,
+    # Auto_Burglar=100) and nowhere else. Distinct from CDS/Side/Alt.
+    0xD1880B7B: "ShotgunDamageScore",
+    # int on weapons/mags; float multiplier on many attachments.
+    # On *weapons* this is reserve/carry junk — UI hides it there.
     0x807AAE98: "MagazineCapacity",
 }
 
@@ -95,6 +119,18 @@ ATTACHMENT_MOD_HASH_NAMES: Dict[int, str] = {
     0x325ECD81: "LoudnessMod",
     0xD02587AE: "DamageMod",
     0xD02587AF: "DamageModB",
+    # Playtested dead on SoftPoint — kept for parser, hidden from GUI
+    0x0C416B3E: "AmmoDamageScale",
+    0xD0E44A75: "AmmoPowerCand",
+    0xD0E44A74: "AmmoPenCand",
+    # Still untested ammo-type candidates
+    0xD0E44A77: "AmmoSpreadCand",  # Normal 0.12–0.35, Match 1.2, 36Buck 1.6
+    0xAF82BE35: "AmmoFactorCand",  # SoftPoint 1.4, Match ~1.25; exe-backed
+    0x920314BF: "AmmoMassCand",    # Normal 2–3.6; exe-backed
+    # SoftPoint > Match (matches in-game Soft Point lethality)
+    0x80553FD9: "AmmoSoftPointCand",  # SoftPoint 1.5, Match 1.0
+    0xE70AB2DE: "AmmoSoftBoostCand",  # SoftPoint 2.0, Match 1.0
+    0xAE7A4305: "AmmoLethalityCand",  # Match 1.4, SubSonic 0.7, NonLethal 0.75
     0xC1B46824: "MobilityMod",
     0x368B80FC: "HandlingMod",
     0x43760D85: "StabilityMod",
@@ -155,8 +191,20 @@ NAME_TO_HASH: Dict[str, int] = {v: k for k, v in HASH_NAMES.items()}
 PROP_LABELS: Dict[str, str] = {
     "EffectiveRange": "Effective Range",
     "MuzzleVelocity": "Muzzle Velocity",
-    "Damage": "Listed Damage",
-    "DamageSpread": "2nd Score / Spread",
+    "Damage": "Listed Damage (unused)",
+    "DamageSpread": "2nd Score (unused)",
+    "DamageDropoff": "Drop-off Score (unused)",
+    "CombatDamageScore": "Weapon Damage",
+    "SidearmDamageScore": "Sidearm Score (candidate)",
+    "AltDamageScore": "Alt Damage Score (candidate)",
+    "SMGDamageScore": "SMG Damage (candidate)",
+    "ShotgunDamageScore": "Shotgun Damage (candidate)",
+    "AmmoSpreadCand": "Ammo Spread × (candidate)",
+    "AmmoFactorCand": "Ammo Factor × (candidate)",
+    "AmmoMassCand": "Ammo Mass × (candidate)",
+    "AmmoSoftPointCand": "Ammo Soft-Point × (candidate)",
+    "AmmoSoftBoostCand": "Ammo Soft Boost × (candidate)",
+    "AmmoLethalityCand": "Ammo Lethality × (candidate)",
     "WindDrop": "Wind Drop",
     "RPM": "RPM",
     "FireRate": "Fire Rate",
@@ -180,7 +228,6 @@ PROP_LABELS: Dict[str, str] = {
     "SwayWalk": "Sway (Walking)",
     "SwayCrouch": "Sway (Crouching)",
     "SwayProne": "Sway (Prone)",
-    "DamageDropoff": "Drop-off / Alt. Score",
     "AudibleRangeBase": "Audible Range",
     "MagazineCapacity": "Magazine Capacity",
     "RecoilHorizontalMod": "Recoil Horizontal (mod)",
@@ -469,7 +516,17 @@ MAGAZINE_ENTITIES = [
     "1903_Trench", "GEW_98_Overpressure", "Geret_06_Experimental_P_Plus",
     # Discovered in common.asr entity table (G43 / shared rifle mags)
     "Kurz_Conversion", "Mg13_trench", "Magazine_pouch",
+    "PPlus_Overpressure", "Small_Overpressure", "Small_Overpressure_M712",
 ]
+
+# Shared gunsmith ammo *types* (Soft Point, Match, AP…) — not magazines.
+# Edited from the Ammo Types browser tab, not per-weapon Magazine slots.
+AMMO_TYPE_ENTITIES = [
+    "SoftPoint", "Match", "ArmourPiercing", "Normal", "SubSonic",
+    "NonLethal", "Slug", "24Buckshot", "36Buckshot", "Proof Rounds",
+    "Pzb39Ammo", "Ammo",
+]
+AMMO_TYPE_ENTITY_SET = set(AMMO_TYPE_ENTITIES)
 
 # Ironsights
 IRONSIGHT_ENTITIES = [
@@ -588,6 +645,7 @@ ALL_ENTITY_NAMES = set(
     + SCOPE_ENTITIES + SUPPRESSOR_ENTITIES
     + BARREL_ENTITIES + MAGAZINE_ENTITIES + IRONSIGHT_ENTITIES
     + CHOKE_ENTITIES + OTHER_ATTACHMENT_ENTITIES
+    + AMMO_TYPE_ENTITIES
 )
 
 # All weapon entity names (for the Weapons tab)
@@ -840,6 +898,12 @@ class AsrFile:
         for entity in self.entities.values():
             self._scan_properties(entity, marker_index)
 
+        # Phase 3: ammo types repeat under several markers with different
+        # partial packs.  First-occurrence windows miss SoftPoint / Match
+        # candidates stored only on later copies — fill missing named hashes
+        # from other windows of the same name.
+        self._merge_ammo_type_occurrences(marker_index)
+
     def _scan_properties(self, entity: Entity,
                          marker_index: Dict[int, int]) -> None:
         """Scan for float and int properties belonging to an entity.
@@ -912,6 +976,17 @@ class AsrFile:
             hash_bytes_map.update(
                 {struct.pack("<I", h): h for h in ATTACHMENT_MOD_HASH_NAMES}
             )
+        # Shotguns: DamageMod is their real damage score (base: Sjogren 20,
+        # M12 5, Auto_Burglar 20), NOT a multiplier like on rifles (1-2).
+        # Some pistols without Sidearm/Alt store it too (Webley 4, Derringer 4,
+        # Welrod 5). Surface it only for those weapons so windows stay clean.
+        elif entity.name in SHOTGUN_ENTITIES or entity.name in (
+            "Webley", "Derringer", "Welrod",
+        ):
+            hash_bytes_map.update({
+                struct.pack("<I", 0xD02587AE): 0xD02587AE,  # DamageMod
+                struct.pack("<I", 0xD02587AF): 0xD02587AF,  # DamageModB
+            })
 
         # Collect all candidates: hash -> list of (offset, type, value)
         candidates: Dict[int, list] = {}
@@ -1051,6 +1126,83 @@ class AsrFile:
 
         entity.properties.extend(found)
 
+    def _merge_ammo_type_occurrences(
+        self, marker_index: Dict[int, int]
+    ) -> None:
+        """Fill missing named hashes on ammo types from later name copies.
+
+        SoftPoint / Match / AP appear several times; each copy only stores a
+        subset of overrides.  First-occurrence scanning alone drops candidates
+        that only live on later packs.
+        """
+        # Collect every marker window per ammo-type name
+        windows: Dict[str, List[Tuple[int, int]]] = {}
+        for i, (name, name_off, marker_off) in enumerate(self._marker_entities):
+            if name not in AMMO_TYPE_ENTITY_SET:
+                continue
+            if i > 0:
+                prev_name, prev_off, _ = self._marker_entities[i - 1]
+                start = prev_off + 8 + len(prev_name) + 4
+            else:
+                start = max(0, marker_off - 8000)
+            windows.setdefault(name, []).append((start, marker_off))
+
+        # Only ammo damage / power-related hashes — not full attachment packs
+        # (later SoftPoint windows sit near unrelated furniture and collide).
+        interest_names = {
+            "DamageMod", "DamageModB", "PenetrationMod", "PowerMod",
+            "PressureMod", "AmmoDamageScale", "AmmoPowerCand", "AmmoPenCand",
+            "AmmoSpreadCand", "AmmoFactorCand", "AmmoMassCand",
+            "AmmoSoftPointCand", "AmmoSoftBoostCand", "AmmoLethalityCand",
+            "CombatDamageScore",
+        }
+        interest = {
+            h: n for h, n in HASH_NAMES.items() if n in interest_names
+        }
+        for name, wins in windows.items():
+            entity = self.entities.get(name)
+            if not entity or len(wins) < 2:
+                continue
+            have = {p.hash for p in entity.properties}
+            for start, end in wins[1:]:
+                for h_int, pname in interest.items():
+                    if h_int in have:
+                        continue
+                    hb = struct.pack("<I", h_int)
+                    pos = start
+                    best = None
+                    while pos < end - 4:
+                        j = self.body.find(hb, pos, end)
+                        if j < 0:
+                            break
+                        if j >= 8:
+                            ptype = struct.unpack(
+                                "<I", self.body[j - 8:j - 4]
+                            )[0]
+                            if ptype == TYPE_FLOAT:
+                                fv = struct.unpack(
+                                    "<f", self.body[j - 4:j]
+                                )[0]
+                                if -500.0 < fv < 5000.0:
+                                    best = (j - 4, TYPE_FLOAT, fv)
+                            elif ptype == TYPE_INT:
+                                iv = struct.unpack(
+                                    "<I", self.body[j - 4:j]
+                                )[0]
+                                if 0 < iv < 10000:
+                                    best = (j - 4, TYPE_INT, float(iv))
+                        pos = j + 1
+                    if best is None:
+                        continue
+                    offset, ptype, value = best
+                    if not (0 <= float(value) <= 20):
+                        continue
+                    entity.properties.append(Property(
+                        type=ptype, offset=offset, hash=h_int,
+                        name=pname, value=value,
+                    ))
+                    have.add(h_int)
+
     @staticmethod
     def _is_closer_to_other_entity(hash_offset: int, this_offset: int,
                                    all_name_offsets: List[int]) -> bool:
@@ -1118,6 +1270,20 @@ class AsrFile:
             "MuzzleVelocity": (100, 3000),
             "Damage": (0, 500),  # 0 is a real override (no listed score)
             "DamageSpread": (0, 500),  # 0 is a real override; Sjögren stock 0.025
+            "CombatDamageScore": (0, 500),
+            "SidearmDamageScore": (-5, 500),
+            "AltDamageScore": (0, 500),
+            "SMGDamageScore": (0, 500),
+            "ShotgunDamageScore": (0, 500),
+            "AmmoDamageScale": (0, 20),
+            "AmmoPowerCand": (0, 20),
+            "AmmoPenCand": (0, 20),
+            "AmmoSpreadCand": (0, 20),
+            "AmmoFactorCand": (0, 20),
+            "AmmoMassCand": (0, 20),
+            "AmmoSoftPointCand": (0, 20),
+            "AmmoSoftBoostCand": (0, 20),
+            "AmmoLethalityCand": (0, 20),
             "WindDrop": (0, 1),
             # RPM is absolute fire-rate on some weapons, but attachment
             # overrides often store multipliers in the ~0.3–1.5 range.
@@ -1446,6 +1612,20 @@ def _scan_entities_in_buffer(buf: bytes) -> Dict[str, Entity]:
         "MuzzleVelocity": (100, 3000),
         "Damage": (0, 500),
         "DamageSpread": (0, 500),
+        "CombatDamageScore": (0, 500),
+        "SidearmDamageScore": (-5, 500),
+        "AltDamageScore": (0, 500),
+        "SMGDamageScore": (0, 500),
+        "ShotgunDamageScore": (0, 500),
+        "AmmoDamageScale": (0, 20),
+        "AmmoPowerCand": (0, 20),
+        "AmmoPenCand": (0, 20),
+        "AmmoSpreadCand": (0, 20),
+        "AmmoFactorCand": (0, 20),
+        "AmmoMassCand": (0, 20),
+        "AmmoSoftPointCand": (0, 20),
+        "AmmoSoftBoostCand": (0, 20),
+        "AmmoLethalityCand": (0, 20),
         "WindDrop": (0, 1),
         "RPM": (0.1, 2000),
         "FireRate": (0.01, 2000),

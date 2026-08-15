@@ -82,6 +82,22 @@ def has_defaults_for(entity_name: str) -> bool:
     return bool(load_defaults().get(entity_name))
 
 
+def missing_defaults(asr_file, entity_name: str) -> list[str]:
+    """Editable patch properties with no shipped vanilla default."""
+    entity = asr_file.entities.get(entity_name)
+    if entity is None:
+        return []
+    missing: list[str] = []
+    for prop in entity.properties:
+        if not prop.name or not getattr(prop, "editable", True):
+            continue
+        if not (prop.is_float or prop.is_int):
+            continue
+        if get_default(entity_name, prop.name) is None:
+            missing.append(prop.name)
+    return missing
+
+
 def reset_entity_to_defaults(asr_file, entity_name: str) -> int:
     """Write shipped vanilla values into the in-memory ASR body.
 

@@ -5,7 +5,12 @@ Sniper Elite 5 ASR/ASRpatch files.
 
 Built with Python and PySide6 (Qt). Runs on Linux and Windows.
 
+The current release is **v1.2.2** — the version number is shown in the
+window title bar.
+
 ## Features
+
+The main window has two tabs: **Weapon Browser** and **Sniper Tweaks**.
 
 ### Weapon Browser
 
@@ -23,7 +28,14 @@ in-game gunsmith:
 
 Each category header shows the weapon count (e.g. "Primary Rifles · 15").
 Weapons are listed under their category using in-game display names
-(e.g. "Karabiner 98" instead of the internal "Kar98K").
+(e.g. "Karabiner 98" instead of the internal "Kar98K", and "Gewehr 43"
+instead of the internal "G43").
+
+**Hidden variant stubs** — Several variant stub weapons have no editable
+stats of their own and are now hidden from the sidebar entirely so they
+do not clutter the list: M1911 Extended, Luger Suppressed, Mk1/Mk2
+Welrod, DLC Mosin, M1A1 Gov. Extended, Gewehr 1943 Kurz Silenced, and
+Super Thompson. Edit the parent weapon instead.
 
 **Colour-coded weapon roles** — Every weapon in the sidebar is
 colour-coded by its role in the game:
@@ -33,6 +45,10 @@ colour-coded by its role in the game:
 | Blue | Player loadout / gunsmith weapon | M1903, M1911, Thompson |
 | Orange | Mission level pickup (not in gunsmith) | Pzb39, Panzerfaust, MG42 |
 | Grey italic | Variant stub (no own stats — edit the parent) | M1911_Plus, Mk1_Welrod |
+
+Non-editable variant stubs (those with no stats at all) are hidden from
+the sidebar; only stubs that still expose a few properties remain
+listed in grey italic.
 
 A colour key at the bottom of the sidebar shows the Loadout and Level
 pickup legends.
@@ -70,9 +86,15 @@ Each Stats and attachment tab uses the same property editor widget:
   the editor shows the thresholds. MagazineCapacity, ZoomMin, ZoomMax,
   and ZoomDefault are exempt from colour coding.
 - **Power / penetration markers** — Fields that actually scale
-  stopping power (DamageMod, DamageModB, PenetrationMod, PressureMod)
-  are marked with a 💥 icon. The listed "Damage" field is deliberately
-  excluded from this marker — playtests show it does not change kills.
+  stopping power are marked with a 💥 icon. The verified working
+  damage field is labelled **Damage** and lives in a "Weapon damage"
+  section: `CombatDamageScore` for rifles, `SidearmDamageScore` for
+  pistols, `SMGDamageScore` for SMGs, and `DamageMod` for shotguns.
+  Unverified damage candidates are shown in an orange **playtest**
+  section so they are easy to try but clearly flagged as unconfirmed.
+  Dead damage fields (including the old listed "Damage" field,
+  hash `0xFFEBCB07`, which playtests showed does not change kills)
+  are hidden entirely.
 - **Read-only base fill-ins** — When a property exists only in the base
   `common.asr` (not in the asrpatch), it is shown as a read-only
   greyed-out field labelled "(base)" so you can see the full weapon
@@ -97,9 +119,10 @@ Each Stats and attachment tab uses the same property editor widget:
   change. Many "damage" fields do not control kills — hit location,
   Custom Difficulty, and ammo type matter more. The notice lists what
   usually still works (magazine capacity, scope zoom, handling feel).
-- **Open Game Folder** — Point the editor at the Sniper Elite 5
-  install (or its `misc/` folder); it finds `common.asr.asrpatch` and
-  `common.asr` automatically.
+- **Open Game Folder** — Choose **Open Game Folder…** (Ctrl+O) and pick
+  the Sniper Elite 5 install folder when prompted ("Pick the Sniper
+  Elite 5 Install Folder."). The editor then finds `common.asr.asrpatch`
+  and `common.asr` automatically.
 
 ## Quick Start
 
@@ -124,8 +147,9 @@ python se5editor.py
 
 ### Opening game data
 
-Use **Open Game Folder…** (Ctrl+O) and pick the `Sniper Elite 5`
-install (or its `misc/` folder). The editor finds:
+Use **Open Game Folder…** (Ctrl+O) and pick the Sniper Elite 5
+install folder when the "Pick the Sniper Elite 5 Install Folder."
+dialog appears. The editor finds:
 
 - `misc/common.asr.asrpatch` — editable weapon / attachment overrides
 - `misc/common.asr` — base stats (used for scope glint disable)
@@ -135,8 +159,8 @@ install (or its `misc/` folder). The editor finds:
 Go to the [Releases page](https://github.com/TinyUnicornMaker/Sniper-Elite-5-Editor/releases)
 and download the latest build for your platform:
 
-- **Windows**: `SniperElite5Editor-vX.Y.Z-windows.zip`
-- **Linux**: `SniperElite5Editor-vX.Y.Z-linux.tar.gz`
+- **Windows**: `SniperElite5Editor-v1.2.2-windows.zip`
+- **Linux**: `SniperElite5Editor-v1.2.2-linux.zip`
 
 Extract and run `SniperElite5Editor` (Linux) or
 `SniperElite5Editor.exe` (Windows). No Python installation required.
@@ -174,7 +198,6 @@ not imported by the running application:
 - `gui/save_difficulty.py`, `gui/save_difficulty_panel.py` — Difficulty research
 - `gui/weapon_editor.py`, `gui/scope_editor.py`, `gui/attachment_editor.py`,
   `gui/ammo_editor.py` — Legacy editors (replaced by the weapon browser)
-- `gui/presets.py` — Legacy preset system (removed from UI)
 
 ## Building a Binary (Windows and Linux)
 
@@ -219,13 +242,13 @@ sudo apt-get install -y libgl1 libegl1 libxkbcommon0 libdbus-1-3 \
 Push a tag to trigger the build workflow:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.2.2
+git push origin v1.2.2
 ```
 
 This builds binaries on `windows-latest` and `ubuntu-22.04` in
 parallel, produces downloadable Windows (`.zip`) and Linux
-(`.tar.gz`) artifacts, and creates a **draft GitHub Release** with
+(`.zip`) artifacts, and creates a **draft GitHub Release** with
 both binaries attached.
 
 You can also trigger a build manually from the Actions tab

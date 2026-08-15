@@ -2,7 +2,7 @@
 
 Replaces the old dropdown-based editors with a sidebar showing weapon
 categories (Primary Rifles, Shotguns, Pistols, SMGs, Special) and a tabbed
-detail view showing the selected weapon's stats, scopes, ammo, and
+detail view showing the selected weapon's stats, scopes, magazines, and
 attachments — mirroring the in-game customization page.
 """
 from __future__ import annotations
@@ -182,15 +182,24 @@ class AttachmentTab(QWidget):
         """Revert this attachment (+ aliases) to vanilla in memory only."""
         if not self.asr_file or not self.current_entity:
             return
-        from gui.vanilla_defaults import reset_entity_to_defaults
+        from gui.vanilla_defaults import missing_defaults, reset_entity_to_defaults
 
         n = 0
+        missing: list[str] = []
         for name in self._alias_group(self.current_entity):
             n += reset_entity_to_defaults(self.asr_file, name)
+            missing.extend(missing_defaults(self.asr_file, name))
         # Reload spins from body so UI matches memory
         self.editor.load_entity(self.current_entity)
         if n:
             self.modified.emit()
+        if missing:
+            shown = ", ".join(sorted(set(missing))[:8])
+            extra = "…" if len(set(missing)) > 8 else ""
+            self.alias_label.setText(
+                f"{self.alias_label.text()}  "
+                f"No shipped vanilla default for: {shown}{extra}"
+            )
 
     def has_entities(self) -> bool:
         return len(self.entity_names) > 0
@@ -201,7 +210,7 @@ class WeaponBrowserPanel(QWidget):
 
     Layout:
         +-------------------+------------------------------------+
-        | Category sidebar  |  [Stats] [Scope] [Ammo] [Barrel]   |
+        | Category sidebar  |  [Stats] [Scope] [Magazine] …     |
         |  Primary Rifles   |                                    |
         |    > M.1903       |  (property editors for selected    |
         |    > Karabiner 98 |   tab)                             |
@@ -307,9 +316,10 @@ class WeaponBrowserPanel(QWidget):
         self.scope_tab.modified.connect(self.modified.emit)
         self.tabs.addTab(self.scope_tab, "Scope")
 
-        self.ammo_tab = AttachmentTab(prop_set="ammo")
-        self.ammo_tab.modified.connect(self.modified.emit)
-        self.tabs.addTab(self.ammo_tab, "Ammo")
+        # Magazines (clips/belts/tubes) — not shared ammo types
+        self.magazine_tab = AttachmentTab(prop_set="ammo")
+        self.magazine_tab.modified.connect(self.modified.emit)
+        self.tabs.addTab(self.magazine_tab, "Magazine")
 
         self.barrel_tab = AttachmentTab(prop_set="attachment")
         self.barrel_tab.modified.connect(self.modified.emit)
@@ -351,7 +361,7 @@ class WeaponBrowserPanel(QWidget):
         # Shotguns: Muzzle includes chokes (as in-game); Receiver replaces Mechanism.
         self.tab_map = {
             "Scope":         self.scope_tab,
-            "Magazine":      self.ammo_tab,  # Magazine = Ammo tab
+            "Magazine":      self.magazine_tab,
             "Barrel":        self.barrel_tab,
             "Suppressor":    self.suppressor_tab,
             "Ironsight":     self.iron_tab,
@@ -555,6 +565,18 @@ class WeaponBrowserPanel(QWidget):
         except Exception:
             aliases = {}
 
+        # Keep Magazine tab as clips/belts/tubes only.
+        try:
+            from asr import AMMO_TYPE_ENTITY_SET
+            mags = [
+                n for n in attachments.get("Magazine", [])
+                if n not in AMMO_TYPE_ENTITY_SET
+            ]
+            if mags or "Magazine" in attachments:
+                attachments["Magazine"] = mags
+        except Exception:
+            pass
+
         # Update each tab
         for tab_name, tab_widget in self.tab_map.items():
             entities = attachments.get(tab_name, [])
@@ -570,9 +592,8 @@ class WeaponBrowserPanel(QWidget):
             tab_text = self.tabs.tabText(i)
             if tab_text == "Stats":
                 self.tabs.setTabVisible(i, True)
-            elif tab_text == "Ammo":
-                # Ammo tab is visible if there are magazines
-                self.tabs.setTabVisible(i, self.ammo_tab.has_entities())
+            elif tab_text == "Magazine":
+                self.tabs.setTabVisible(i, self.magazine_tab.has_entities())
             else:
                 tab_widget = self.tab_map.get(tab_text)
                 if tab_widget:
@@ -640,7 +661,7 @@ class WeaponBrowserPanel(QWidget):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        from gui.vanilla_defaults import reset_entity_to_defaults
+        from gui.vanilla_defaults import missing_defaults, reset_entity_to_defaults
 
         names: list[str] = [self.current_weapon]
         available = set(self.asr_file.entities.keys())
@@ -673,8 +694,12 @@ class WeaponBrowserPanel(QWidget):
                 ordered.append(n)
 
         total = 0
+        missing: list[str] = []
         for name in ordered:
             total += reset_entity_to_defaults(self.asr_file, name)
+            missing.extend(
+                f"{name}.{p}" for p in missing_defaults(self.asr_file, name)
+            )
 
         # Refresh open editors so spinboxes match memory
         self.stats_tab.load_entity(self.current_weapon)
@@ -683,6 +708,19 @@ class WeaponBrowserPanel(QWidget):
             if tab.current_entity:
                 tab.editor.load_entity(tab.current_entity)
 
+        miss_note = ""
+        if missing:
+            preview = "<br>".join(sorted(set(missing))[:12])
+            more = (
+                f"<br>…and {len(set(missing)) - 12} more"
+                if len(set(missing)) > 12 else ""
+            )
+            miss_note = (
+                "<br><br>No shipped vanilla default (not restored) for:<br>"
+                f"{preview}{more}<br>"
+                "Current game files are modified — defaults were not "
+                "re-snapshotted from them."
+            )
         if total:
             self.modified.emit()
             QMessageBox.information(
@@ -692,13 +730,15 @@ class WeaponBrowserPanel(QWidget):
                 f"<b>Save is now enabled</b> — press Ctrl+S, then fully "
                 f"restart the game.<br>"
                 f"Until you Save, Sniper Elite still uses the old "
-                f"<code>common.asr.asrpatch</code> on disk.",
+                f"<code>common.asr.asrpatch</code> on disk."
+                f"{miss_note}",
             )
         else:
             QMessageBox.information(
                 self, "Nothing to reset",
                 "No shipped vanilla values could be written (missing "
-                "defaults or only read-only base properties).",
+                "defaults or only read-only base properties)."
+                f"{miss_note}",
             )
 
     def get_all_entity_names(self) -> list[str]:

@@ -26,7 +26,7 @@ from gui.sniper_tweaks import SniperTweaksPanel
 
 # First-launch limitations notice. Bump the key if the text must be
 # shown again after a major honesty / capability change.
-_LIMITATIONS_SETTINGS_KEY = "ui/limitations_ack_v1"
+_LIMITATIONS_SETTINGS_KEY = "ui/limitations_ack_v5"
 
 # Compact sections: (heading, list of short bullets)
 _LIMITATIONS_SECTIONS: list[tuple[str, list[str]]] = [
@@ -38,28 +38,29 @@ _LIMITATIONS_SECTIONS: list[tuple[str, list[str]]] = [
         ],
     ),
     (
-        "Damage edits are unreliable",
+        "Damage",
         [
-            "Kills come from hit location (head / heart / lungs).",
-            "Custom Difficulty → Enemy Resilience also matters.",
-            "Loaded ammo type matters (Soft Point, AP, Match, Non-Lethal…).",
-            "“Damage” / “Power” fields often do little or nothing to kills.",
-            "Treat damage-related numbers as experimental.",
+            "Weapon Damage (hash D840A465) scales rifles only — playtested G43.",
+            "Pistol damage = Sidearm / Alt Score (orange fields) — verified.",
+            "SMG damage = SMG Damage; Shotgun damage = Shotgun Damage (DamageMod).",
+            "Listed Damage and ammo Power/Pen/Scale A do nothing — hidden.",
+            "Kills also depend on hit location and Enemy Resilience.",
         ],
     ),
     (
         "What usually still works",
         [
-            "Magazine capacity on the magazine entity (real mag size).",
+            "Weapon Damage on the Stats tab.",
+            "Magazine capacity on the Magazine sub-tab (real mag size).",
             "Scope Zoom Min / Max on many optics.",
-            "Handling feel: recoil, sway, range, velocity, audible range.",
+            "Handling: recoil, sway, range, velocity, audible range.",
         ],
     ),
     (
         "Shared parts",
         [
             "Scopes, magazines, barrels, suppressors are shared records.",
-            "One edit applies to every gun that can equip that part.",
+            "One edit applies to every gun that can use that part.",
         ],
     ),
     (
@@ -78,7 +79,12 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Sniper Elite 5 Editor")
+        try:
+            from gui._version import APP_VERSION
+            title = f"Sniper Elite 5 Editor v{APP_VERSION}"
+        except ImportError:
+            title = "Sniper Elite 5 Editor"
+        self.setWindowTitle(title)
         self.setMinimumSize(1100, 700)
 
         self.asr_file: AsrFile | None = None
@@ -339,10 +345,7 @@ class MainWindow(QMainWindow):
             self._info_shown = True
             QMessageBox.information(
                 self, "Open Game Folder",
-                "Pick the <b>Sniper Elite 5</b> install (or its <b>misc</b> "
-                "folder). The editor loads <code>common.asr.asrpatch</code> "
-                "and merges <code>common.asr</code>. A <code>.bak</code> "
-                "is created on first open.",
+                "Pick the Sniper Elite 5 Install Folder.",
             )
 
         start = self._default_open_dir()
@@ -670,11 +673,17 @@ class MainWindow(QMainWindow):
 
     def _update_window_title(self):
         """Show the current file name and modified marker in the window title."""
-        title = "Sniper Elite 5 Editor"
+        try:
+            from gui._version import APP_VERSION
+            base = f"Sniper Elite 5 Editor v{APP_VERSION}"
+        except ImportError:
+            base = "Sniper Elite 5 Editor"
         if self.current_path:
             name = os.path.basename(self.current_path)
             marker = " *" if self._is_modified else ""
-            title = f"{name}{marker} — {title}"
+            title = f"{name}{marker} — {base}"
+        else:
+            title = base
         self.setWindowTitle(title)
 
     def _refresh_status(self):

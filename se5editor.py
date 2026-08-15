@@ -13,6 +13,7 @@ sys.path.insert(0, _ROOT)
 # Application identity — used for Windows taskbar grouping and Linux .desktop
 APP_ID = "com.tinyunicornmaker.se5editor"
 APP_NAME = "Sniper Elite 5 Editor"
+from gui._version import APP_VERSION
 
 
 def _clear_stale_caches(root_dir: str):
@@ -171,6 +172,7 @@ def main():
     QApplication.setApplicationName(APP_NAME)
     QApplication.setOrganizationName("se5editor")
     QApplication.setDesktopFileName(APP_ID)
+    QApplication.setApplicationVersion(APP_VERSION)
 
     _install_excepthook()
 
