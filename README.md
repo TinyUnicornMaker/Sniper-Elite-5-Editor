@@ -32,26 +32,10 @@ Weapons are listed under their category using in-game display names
 instead of the internal "G43").
 
 **Hidden variant stubs** — Several variant stub weapons have no editable
-stats of their own and are now hidden from the sidebar entirely so they
+stats of their own and are hidden from the sidebar entirely so they
 do not clutter the list: M1911 Extended, Luger Suppressed, Mk1/Mk2
 Welrod, DLC Mosin, M1A1 Gov. Extended, Gewehr 1943 Kurz Silenced, and
 Super Thompson. Edit the parent weapon instead.
-
-**Colour-coded weapon roles** — Every weapon in the sidebar is
-colour-coded by its role in the game:
-
-| Colour | Meaning | Examples |
-|--------|---------|----------|
-| Blue | Player loadout / gunsmith weapon | M1903, M1911, Thompson |
-| Orange | Mission level pickup (not in gunsmith) | Pzb39, Panzerfaust, MG42 |
-| Grey italic | Variant stub (no own stats — edit the parent) | M1911_Plus, Mk1_Welrod |
-
-Non-editable variant stubs (those with no stats at all) are hidden from
-the sidebar; only stubs that still expose a few properties remain
-listed in grey italic.
-
-A colour key at the bottom of the sidebar shows the Loadout and Level
-pickup legends.
 
 **Tabbed detail view** — Selecting a weapon opens tabs for each
 attachment slot it supports in-game:
@@ -201,8 +185,8 @@ not imported by the running application:
 
 ## Building a Binary (Windows and Linux)
 
-A PyInstaller spec file and GitHub Actions workflow are included for
-building standalone Windows and Linux binaries.
+A PyInstaller spec file is included for building standalone Windows and
+Linux binaries.
 
 ### Local build
 
@@ -236,24 +220,6 @@ sudo apt-get install -y libgl1 libegl1 libxkbcommon0 libdbus-1-3 \
   libxrandr2 libxrender1 libasound2 libpulse0 \
   libglib2.0-0 libfreetype6 libharfbuzz0b
 ```
-
-### GitHub Actions (automated releases)
-
-Push a tag to trigger the build workflow:
-
-```bash
-git tag v1.2.2
-git push origin v1.2.2
-```
-
-This builds binaries on `windows-latest` and `ubuntu-22.04` in
-parallel, produces downloadable Windows (`.zip`) and Linux
-(`.zip`) artifacts, and creates a **draft GitHub Release** with
-both binaries attached.
-
-You can also trigger a build manually from the Actions tab
-(Build Binaries → Run workflow) without creating a tag — the
-artifacts get a `dev-<sha>` version label.
 
 ## ASR File Format
 
