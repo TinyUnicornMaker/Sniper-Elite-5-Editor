@@ -81,8 +81,11 @@ def _install_linux_desktop_entry():
         exe_path = os.path.abspath(sys.executable)
     else:
         # Running from source — launch via python3 so the shebang is not
-        # relied upon (some desktop environments don't honour it)
-        exe_path = f"python3 {os.path.abspath(__file__)}"
+        # relied upon (some desktop environments don't honour it).
+        # Quote the script path per the freedesktop Exec spec so spaces
+        # in the directory name don't break the launch.
+        script = os.path.abspath(__file__)
+        exe_path = f"python3 \"{script}\""
 
     home = Path.home()
     apps_dir = home / ".local" / "share" / "applications"
